@@ -1212,6 +1212,24 @@ function hasPgk(){return S.flights.some(f=>f.dep==='PGK'||f.arr==='PGK')}
 function showNotif(m){const n=document.getElementById('notif');n.textContent='✓ '+m;n.style.display='block';setTimeout(()=>n.style.display='none',2500)}
 function airlinesClassOf(code){return code==='KE'||code==='OZ'?'al-ke':code==='GA'?'al-ga':'al-xx'}
 
+// 항공사 공식 홈페이지 — 검색조건 자동입력은 지원하지 않아(대부분 SPA) 홈페이지로만 연결
+const AIRLINE_HOMEPAGE = {
+  KE:'https://www.koreanair.com', OZ:'https://flyasiana.com', GA:'https://www.garuda-indonesia.com',
+  SQ:'https://www.singaporeair.com', MH:'https://www.malaysiaairlines.com', VN:'https://www.vietnamairlines.com',
+  TG:'https://www.thaiairways.com', PR:'https://www.philippineairlines.com', NH:'https://www.ana.co.jp',
+  JL:'https://www.jal.com', CA:'https://www.airchina.com', MU:'https://www.ceair.com', CZ:'https://www.csair.com',
+};
+function airlineHomepage(code){ return AIRLINE_HOMEPAGE[code] || null; }
+// 실제 존재하는 편인지 FlightAware에서 바로 확인할 수 있는 링크 (편명 기반, 공식 문서화된 URL 패턴)
+function flightAwareUrl(num){ return `https://www.flightaware.com/live/flight/${encodeURIComponent((num||'').replace(/\s+/g,''))}`; }
+// 항공편 행에 붙는 "홈페이지 / 실제 확인" 링크 묶음 HTML — 행 클릭(선택) 이벤트와 겹치지 않게 stopPropagation
+function verifyLinksHtml(airline, num){
+  const home = airlineHomepage(airline);
+  const homeLink = home ? `<a href="${home}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="${airline} 항공사 홈페이지" style="text-decoration:none;font-size:11px">🏠</a>` : '';
+  const faLink = `<a href="${flightAwareUrl(num)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="FlightAware에서 실제 운항 여부 확인" style="text-decoration:none;font-size:11px">🔍</a>`;
+  return `<span style="display:inline-flex;gap:6px;align-items:center;flex-shrink:0">${homeLink}${faLink}</span>`;
+}
+
 // ============================================================
 // CALENDAR
 // ============================================================
@@ -1523,6 +1541,7 @@ function renderFlights(){
             <span class="fi-sched-num">${s.num}</span>
             <span class="fi-sched-time">${s.depT} – ${s.arrT}</span>
             <span class="fi-sched-note">${f.dep} → ${f.arr}</span>
+            ${verifyLinksHtml(s.airline, s.num)}
           </div>`;
         }).join('');
 
@@ -1671,6 +1690,7 @@ async function searchSchedule(){
       <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;min-width:56px">${r.num}</span>
       <span style="font-size:12px;color:var(--text2);flex:1">${dep} → ${arr}</span>
       <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2)">${r.depT} – ${r.arrT}</span>
+      ${verifyLinksHtml(r.airline, r.num)}
     </div>`).join('');
   // store for picking
   listEl._data={results,dep,arr};
