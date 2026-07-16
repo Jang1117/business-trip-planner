@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>출장 일정 관리 — TripPlanner</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <style>
 :root{
   --bg:#f4f5f7;--white:#fff;--s2:#f8f9fb;--s3:#f0f2f5;
@@ -2395,7 +2395,8 @@ function splitTimeCells(timeStr){
   return [timeStr,'',''];
 }
 
-// "상세출장일정.xlsx" 양식(No/DATE/TIME/ACTIVITIES/항공편/숙박 + 항공편 요약 + 차량·호텔 요약, 3단 표)을 그대로 재현해 엑셀로 저장
+// "상세출장일정.xlsx" 양식(No/DATE/TIME/ACTIVITIES/항공편/숙박 + 항공편 요약 + 차량·호텔 요약, 3단 표)을
+// 색상·병합까지 그대로 재현해 엑셀로 저장 (xlsx-js-style — 셀 스타일을 지원하는 SheetJS 확장판)
 function exportExcel(){
   if(!S.startDate||!S.endDate){ showNotif('먼저 출발일·귀국일을 설정하세요'); return; }
   const n=Math.round((S.endDate-S.startDate)/86400000);
@@ -2403,53 +2404,112 @@ function exportExcel(){
   const titleMain=`${S.dept} ${S.name} 출장 (${fmtMD(S.startDate)} ~ ${fmtMD(S.endDate)})`;
   const durText=`(${n}박${n+1}일)`;
 
-  const aoa=[];
-  const merges=[];
+  // ── 셀 스타일 (화면 미리보기 exp-table 배색과 동일: 이동=peach, 항공편=blue, GA편=green, 헤더/타이틀=yellow) ──
+  const BORDER={style:'thin', color:{rgb:'C9B98A'}};
+  const B4={top:BORDER,bottom:BORDER,left:BORDER,right:BORDER};
+  const FILL=rgb=>({patternType:'solid', fgColor:{rgb}});
+  const HEADER_FILL=FILL('FDF3B0'), MOVE_FILL=FILL('FDECC8'), FLIGHT_FILL=FILL('DDE3F5'), GA_FILL=FILL('DCF3EA'), FOOT_FILL=FILL('F8F9FB');
+  const CLS_FILL={'exp-row-move':MOVE_FILL, 'exp-row-flight':FLIGHT_FILL, 'exp-row-ga':GA_FILL};
+  const sty=(o={})=>({
+    font:{bold:!!o.bold, sz:o.sz||10, color:o.color?{rgb:o.color}:undefined},
+    alignment:{horizontal:o.h||'center', vertical:'center', wrapText:!!o.wrap},
+    border:B4,
+    fill:o.fill,
+  });
+
+  const aoa=[]; const styles=[]; const merges=[];
+  const pushRow=(cells, rowStyles)=>{ aoa.push(cells); styles.push(rowStyles||[]); };
   const addHeader=(cols)=>{
     const r=aoa.length;
-    aoa.push(['','No.','DATE','TIME','','','ACTIVITIES',cols[0],cols[1]]);
+    const hs=sty({bold:true, fill:HEADER_FILL});
+    pushRow(['','No.','DATE','TIME','','','ACTIVITIES',cols[0],cols[1]], [null,hs,hs,hs,hs,hs,hs,hs,hs]);
     merges.push({s:{r,c:3},e:{r,c:5}});
   };
 
   // ── 표1: 전체 일정표 ──
-  aoa.push(['',titleMain,'','','','','','',durText]);
-  merges.push({s:{r:0,c:1},e:{r:0,c:6}});
+  const titleRow=aoa.length;
+  pushRow(['',titleMain,'','','','','','',durText], [
+    null, sty({bold:true, sz:13, h:'left', fill:HEADER_FILL}), sty({fill:HEADER_FILL}), sty({fill:HEADER_FILL}),
+    sty({fill:HEADER_FILL}), sty({fill:HEADER_FILL}), sty({fill:HEADER_FILL}), sty({fill:HEADER_FILL}),
+    sty({bold:true, color:'C0392B', h:'right', fill:HEADER_FILL}),
+  ]);
+  merges.push({s:{r:titleRow,c:1},e:{r:titleRow,c:6}});
+  merges.push({s:{r:titleRow,c:7},e:{r:titleRow,c:8}});
   addHeader(['항공편','숙박']);
+
+  // 숙박 칸은 연속된 날짜의 호텔명이 같으면 하나로 병합(실제 체류 기간 그대로 반영)
+  let prevHotel=null, hotelMergeStart=null;
+  const flushHotelMerge=endRow=>{
+    if(hotelMergeStart!=null && endRow>hotelMergeStart) merges.push({s:{r:hotelMergeStart,c:8},e:{r:endRow,c:8}});
+    hotelMergeStart=null;
+  };
   buildExportRows().forEach((day,i)=>{
+    const dayStartRow=aoa.length;
     day.rows.forEach((r,ri)=>{
       const [ts,dash,te]=splitTimeCells(r.time);
-      const dateStr = ri===0 ? `${toISO(day.date)} (${DOWS[day.date.getDay()]})` : '';
-      aoa.push(['', ri===0?(i+1):'', dateStr, ts, dash, te, r.text, r.flight||'', ri===day.rows.length-1?(day.hotel||''):'']);
+      const dateStr = ri===0 ? `${day.date.getFullYear()}년 ${day.date.getMonth()+1}월 ${day.date.getDate()}일\n(${DOWS[day.date.getDay()]})` : '';
+      const fill=CLS_FILL[r.cls]||undefined;
+      pushRow(
+        ['', ri===0?(i+1):'', dateStr, ts, dash, te, r.text, r.flight||'', ri===day.rows.length-1?(day.hotel||''):''],
+        [null, sty({bold:true}), sty({wrap:true}), sty({fill}), sty({fill}), sty({fill}), sty({h:'left',wrap:true,fill}), sty({bold:true,fill}), sty({wrap:true})]
+      );
     });
+    const dayEndRow=aoa.length-1;
+    if(day.rows.length>1){
+      merges.push({s:{r:dayStartRow,c:1},e:{r:dayEndRow,c:1}}); // No.
+      merges.push({s:{r:dayStartRow,c:2},e:{r:dayEndRow,c:2}}); // DATE
+    }
+    if(day.hotel && day.hotel===prevHotel){
+      // 이전 날짜와 같은 호텔 — 병합 구간 계속 진행
+    }else{
+      flushHotelMerge(dayStartRow-1);
+      hotelMergeStart = day.hotel ? dayStartRow : null;
+    }
+    prevHotel = day.hotel || null;
   });
+  flushHotelMerge(aoa.length-1);
 
   // ── 표2: 항공편 요약 ──
-  aoa.push([]);
+  aoa.push([]); styles.push([]);
   addHeader(['Airplane','비고']);
   [...S.flights].sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.depT||'').localeCompare(b.depT||'')).forEach((f,idx)=>{
     const plus1=(f.arrT||'').includes('+1');
     const arrClean=(f.arrT||'').replace('+1','');
     const depName=IATA_TO_NAME[f.dep]||f.dep, arrName=IATA_TO_NAME[f.arr]||f.arr;
     const activities=`${depName} (${f.dep}) → ${arrName} (${f.arr})${plus1?' (+1)':''}`;
-    aoa.push(['', idx+1, f.date||'', f.depT||'', '-', arrClean, activities, f.num||'', f.note||'']);
+    pushRow(['', idx+1, f.date||'', f.depT||'', '-', arrClean, activities, f.num||'', f.note||''],
+      [null, sty({bold:true}), sty(), sty(), sty(), sty(), sty({h:'left',wrap:true}), sty({bold:true}), sty({wrap:true})]);
   });
 
   // ── 표3: 차량 배차 · 호텔 요약 ──
-  aoa.push([]);
+  aoa.push([]); styles.push([]);
   addHeader(['Transportation','Hotel']);
   [...S.transfers].filter(t=>t.on).sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.time||'').localeCompare(b.time||'')).forEach((t,idx)=>{
     const showHotel=/호텔|hotel/i.test(t.label);
     const hotel=showHotel && t.date ? S.hotels.find(h=>h.cin && h.cin<=t.date && (!h.cout||t.date<h.cout)) : null;
-    aoa.push(['', idx+1, t.date||'', t.time||'-', '', '', t.label, 'O', hotel?hotel.name:'']);
+    pushRow(['', idx+1, t.date||'', t.time||'-', '', '', t.label, 'O', hotel?hotel.name:''],
+      [null, sty({bold:true}), sty(), sty(), sty(), sty(), sty({h:'left',wrap:true}), sty({bold:true}), sty({wrap:true})]);
   });
 
-  aoa.push([]);
-  aoa.push(['','TripPlanner 자동 생성 · '+S.country+' · '+S.city+' · '+S.purpose]);
-  merges.push({s:{r:aoa.length-1,c:1},e:{r:aoa.length-1,c:8}});
+  aoa.push([]); styles.push([]);
+  const footRow=aoa.length;
+  pushRow(['','TripPlanner 자동 생성 · '+S.country+' · '+S.city+' · '+S.purpose],
+    [null, sty({fill:FOOT_FILL, color:'9AA5B4', sz:9})]);
+  merges.push({s:{r:footRow,c:1},e:{r:footRow,c:8}});
 
   const ws=XLSX.utils.aoa_to_sheet(aoa);
   ws['!merges']=merges;
   ws['!cols']=[{wch:3},{wch:5},{wch:21},{wch:7},{wch:3},{wch:7},{wch:57},{wch:19},{wch:20}];
+  ws['!rows']=aoa.map((_,r)=>r===titleRow?{hpt:26}:{hpt:20});
+
+  styles.forEach((rowStyles,r)=>{
+    rowStyles.forEach((s,c)=>{
+      if(!s) return;
+      const ref=XLSX.utils.encode_cell({r,c});
+      if(!ws[ref]) ws[ref]={t:'s', v:''};
+      ws[ref].s=s;
+    });
+  });
 
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '출장');
