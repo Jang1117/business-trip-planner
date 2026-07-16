@@ -991,11 +991,14 @@ async function fetchLiveSchedules(dep, arr){
     const seen = new Set();
     const out = [];
     json.response.forEach(it=>{
+      // cs_airline_iata가 있으면 이 행은 실제 운항사가 아니라 타사 공동운항편의 마케팅 편명(코드셰어)이므로 제외
+      // — 안 그러면 같은 실제 항공편이 여러 항공사 편명으로 중복 노출됨 (예: KE437 운항편이 GA9829로도 뜸)
+      if(it.cs_airline_iata) return;
       const num = it.airline_iata && it.flight_number ? `${it.airline_iata} ${it.flight_number}` : it.flight_iata;
       const depT = it.dep_time ? it.dep_time.slice(0,5) : null;
       const arrT = it.arr_time ? it.arr_time.slice(0,5) : null;
       if(!num || !depT || !arrT || !it.airline_iata) return;
-      const dedupKey = num+depT;
+      const dedupKey = `${depT}_${arrT}`;
       if(seen.has(dedupKey)) return;
       seen.add(dedupKey);
       out.push({num, dep: (it.dep_iata||dep).toUpperCase(), arr: (it.arr_iata||arr).toUpperCase(), depT, arrT, airline: it.airline_iata});
@@ -1014,7 +1017,7 @@ async function loadRouteSchedules(dep, arr){
   const cached = ROUTE_CACHE[key];
   if(cached) return cached.schedules;
 
-  const remoteRaw = await sharedCacheGet(`flight:${key}`);
+  const remoteRaw = await sharedCacheGet(`flight2:${key}`);
   if(remoteRaw){
     try{
       const remote = JSON.parse(remoteRaw);
@@ -1031,7 +1034,7 @@ async function loadRouteSchedules(dep, arr){
   }
   const entry = {schedules, source};
   ROUTE_CACHE[key] = entry;
-  sharedCacheSet(`flight:${key}`, JSON.stringify(entry), ROUTE_CACHE_TTL_SECONDS);
+  sharedCacheSet(`flight2:${key}`, JSON.stringify(entry), ROUTE_CACHE_TTL_SECONDS);
   return schedules;
 }
 
