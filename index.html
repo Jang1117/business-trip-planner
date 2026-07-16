@@ -1220,19 +1220,6 @@ const AIRLINE_HOMEPAGE = {
   JL:'https://www.jal.com', CA:'https://www.airchina.com', MU:'https://www.ceair.com', CZ:'https://www.csair.com',
 };
 function airlineHomepage(code){ return AIRLINE_HOMEPAGE[code] || null; }
-// FlightAware는 IATA 편명(KE437)이 아니라 ICAO 편명(KAL437) 기준으로 검색되는 경우가 많아 ICAO 코드로 변환
-const AIRLINE_ICAO = {
-  KE:'KAL', OZ:'AAR', GA:'GIA', SQ:'SIA', MH:'MAS', VN:'HVN',
-  TG:'THA', PR:'PAL', NH:'ANA', JL:'JAL', CA:'CCA', MU:'CES', CZ:'CSN',
-};
-// 실제 존재하는 편인지 FlightAware에서 바로 확인할 수 있는 링크 (편명 기반, 공식 문서화된 URL 패턴)
-function flightAwareUrl(airline, num){
-  const icao = AIRLINE_ICAO[airline];
-  const compact = (num||'').replace(/\s+/g,'');
-  const numPart = compact.match(/\d.*$/)?.[0] || compact; // 편명에서 항공사 코드를 뗀 숫자(+접미) 부분만 추출
-  const code = icao ? `${icao}${numPart}` : compact;
-  return `https://www.flightaware.com/live/flight/${encodeURIComponent(code)}`;
-}
 // 아고다 항공편 검색 결과 링크 — 실제 판매 중인 항공편인지(스케줄 존재 여부) 교차검증용. 날짜가 없으면 만들지 않음
 function agodaFlightUrl(dep, arr, dateStr){
   if(!dep || !arr || !dateStr) return null;
@@ -1247,10 +1234,9 @@ function agodaFlightUrl(dep, arr, dateStr){
 function verifyLinksHtml(airline, num, dep, arr, dateStr){
   const home = airlineHomepage(airline);
   const homeLink = home ? `<a href="${home}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="${airline} 항공사 홈페이지" style="text-decoration:none;font-size:11px">🏠</a>` : '';
-  const faLink = `<a href="${flightAwareUrl(airline, num)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="FlightAware에서 실제 운항 여부 확인" style="text-decoration:none;font-size:11px">🔍</a>`;
   const agodaUrl = agodaFlightUrl(dep, arr, dateStr);
   const agodaLink = agodaUrl ? `<a href="${agodaUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="아고다에서 해당 노선·날짜 실제 판매 여부 확인" style="text-decoration:none;font-size:11px">🛫</a>` : '';
-  return `<span style="display:inline-flex;gap:6px;align-items:center;flex-shrink:0">${homeLink}${faLink}${agodaLink}</span>`;
+  return `<span style="display:inline-flex;gap:6px;align-items:center;flex-shrink:0">${homeLink}${agodaLink}</span>`;
 }
 
 // ============================================================
