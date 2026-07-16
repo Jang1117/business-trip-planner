@@ -912,6 +912,17 @@ function filterNationalCarriers(schedules){
   return schedules.filter(s=>NATIONAL_CARRIERS.has(s.airline));
 }
 
+// 같은 노선의 나머지 편들과 비교해 소요시간이 비정상적으로 튀는 항목(오래된/잘못된 노선DB 값)을 걸러낸다
+// — 표본이 3개 미만이면 이상치 판단이 불가능하므로 그대로 둔다
+function filterDurationOutliers(entries){
+  if(entries.length < 3) return entries;
+  const durations = entries.map(e=>e._dur).sort((a,b)=>a-b);
+  const mid = Math.floor(durations.length/2);
+  const median = durations.length%2 ? durations[mid] : (durations[mid-1]+durations[mid])/2;
+  const tolerance = Math.max(60, median*0.25); // 중앙값 대비 25% 또는 60분 중 큰 값까지는 정상 편차로 허용
+  return entries.filter(e=>Math.abs(e._dur-median) <= tolerance);
+}
+
 // ============================================================
 // 실시간 항공편 스케줄 조회 (AirLabs) + 캐시 + MOCK 폴백
 // ============================================================
@@ -1001,9 +1012,18 @@ async function fetchLiveSchedules(dep, arr){
       const dedupKey = `${depT}_${arrT}`;
       if(seen.has(dedupKey)) return;
       seen.add(dedupKey);
-      out.push({num, dep: (it.dep_iata||dep).toUpperCase(), arr: (it.arr_iata||arr).toUpperCase(), depT, arrT, airline: it.airline_iata});
+      // 소요시간(분) — API가 duration을 안 주면 출발/도착 시각 차이로 추정(다음날 도착 가정)
+      let dur = typeof it.duration === 'number' && it.duration > 0 ? it.duration : null;
+      if(dur == null){
+        const [dh,dm] = depT.split(':').map(Number);
+        const [ah,am] = arrT.split(':').map(Number);
+        dur = (ah*60+am) - (dh*60+dm);
+        if(dur <= 0) dur += 24*60;
+      }
+      out.push({num, dep: (it.dep_iata||dep).toUpperCase(), arr: (it.arr_iata||arr).toUpperCase(), depT, arrT, airline: it.airline_iata, _dur: dur});
     });
-    return filterNationalCarriers(out);
+    const cleaned = filterDurationOutliers(out).map(({_dur, ...rest})=>rest);
+    return filterNationalCarriers(cleaned);
   }catch(e){
     console.warn('항공편 API 조회 실패:', e);
   }
@@ -1017,7 +1037,7 @@ async function loadRouteSchedules(dep, arr){
   const cached = ROUTE_CACHE[key];
   if(cached) return cached.schedules;
 
-  const remoteRaw = await sharedCacheGet(`flight2:${key}`);
+  const remoteRaw = await sharedCacheGet(`flight3:${key}`);
   if(remoteRaw){
     try{
       const remote = JSON.parse(remoteRaw);
@@ -1034,7 +1054,7 @@ async function loadRouteSchedules(dep, arr){
   }
   const entry = {schedules, source};
   ROUTE_CACHE[key] = entry;
-  sharedCacheSet(`flight2:${key}`, JSON.stringify(entry), ROUTE_CACHE_TTL_SECONDS);
+  sharedCacheSet(`flight3:${key}`, JSON.stringify(entry), ROUTE_CACHE_TTL_SECONDS);
   return schedules;
 }
 
