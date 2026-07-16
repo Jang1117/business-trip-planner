@@ -1,0 +1,2446 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>출장 일정 관리 — TripPlanner</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#f4f5f7;--white:#fff;--s2:#f8f9fb;--s3:#f0f2f5;
+  --border:#e3e7ef;--border2:#cbd3e0;
+  --text:#0f1923;--text2:#4a5568;--text3:#9aa5b4;
+  --blue:#1a5cf8;--blue-l:#eef2ff;--blue-b:#c7d7fe;
+  --ke:#1447b3;--ke-bg:#eef2ff;--ke-bd:#b5c6f8;
+  --ga:#0a7a50;--ga-bg:#edfaf4;--ga-bd:#9ddfc4;
+  --red:#c0392b;--red-bg:#fef2f2;--red-bd:#fca5a5;
+  --ora:#c2460a;--ora-bg:#fff7ed;--ora-bd:#fdba74;
+  --pur:#5b21b6;--pur-bg:#f5f3ff;--pur-bd:#c4b5fd;
+  --grn:#065f46;--grn-bg:#ecfdf5;--grn-bd:#6ee7b7;
+  --sha-xs:0 1px 2px rgba(15,25,35,.05);
+  --sha-sm:0 1px 3px rgba(15,25,35,.08),0 1px 2px rgba(15,25,35,.05);
+  --sha:0 4px 6px -1px rgba(15,25,35,.08),0 2px 4px -2px rgba(15,25,35,.05);
+  --sha-md:0 10px 15px -3px rgba(15,25,35,.08),0 4px 6px -4px rgba(15,25,35,.05);
+  --r:10px;--r-sm:6px;--r-xs:4px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5}
+
+/* ── HEADER ── */
+.hdr{background:var(--white);border-bottom:1px solid var(--border);height:54px;padding:0 24px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:300;box-shadow:var(--sha-xs)}
+.hdr-logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;color:var(--blue);letter-spacing:-.3px}
+.hdr-logo-box{width:28px;height:28px;background:var(--blue);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px}
+.hdr-sep{width:1px;height:18px;background:var(--border)}
+.hdr-trip{font-size:12px;color:var(--text2)}
+.hdr-r{margin-left:auto;display:flex;align-items:center;gap:8px}
+.pill{background:var(--blue-l);color:var(--blue);border:1px solid var(--blue-b);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700}
+
+/* ── LAYOUT ── */
+.layout{display:grid;grid-template-columns:248px 1fr;min-height:calc(100vh - 54px)}
+
+/* ── SIDEBAR ── */
+.sidebar{background:var(--white);border-right:1px solid var(--border);padding:16px 12px;position:sticky;top:54px;height:calc(100vh - 54px);overflow-y:auto;display:flex;flex-direction:column;gap:20px}
+.sb-label{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--text3);padding:0 6px;margin-bottom:6px}
+.step-list{display:flex;flex-direction:column;gap:2px}
+.step{display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:var(--r-sm);cursor:pointer;border:1px solid transparent;transition:all .12s}
+.step:hover{background:var(--s2)}
+.step.active{background:var(--blue-l);border-color:var(--blue-b)}
+.step.done .snum{background:var(--grn);border-color:var(--grn);color:#fff}
+.snum{width:21px;height:21px;border-radius:50%;background:var(--s3);border:1.5px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:10px;font-family:'JetBrains Mono',monospace;font-weight:500;color:var(--text2);flex-shrink:0;transition:all .18s}
+.step.active .snum{background:var(--blue);border-color:var(--blue);color:#fff}
+.slabel{font-size:12px;font-weight:500;color:var(--text2)}
+.step.active .slabel{color:var(--blue)}
+.step.done .slabel{color:var(--text)}
+
+.sum-card{background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:12px}
+.sum-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:12px}
+.sum-k{color:var(--text2)}
+.sum-v{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;color:var(--text)}
+.sum-sep{height:1px;background:var(--border);margin:5px 0}
+.sum-chip{background:var(--grn-bg);color:var(--grn);border:1px solid var(--grn-bd);border-radius:var(--r-xs);padding:1px 7px;font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace}
+
+/* ── MAIN ── */
+.main{padding:22px 26px;min-width:0}
+.sec{display:none}.sec.active{display:block}
+.sec-h{font-size:16px;font-weight:700;margin-bottom:3px}
+.sec-sub{font-size:12px;color:var(--text2);margin-bottom:18px}
+
+/* ── TABS ── */
+.tabs{display:flex;border-bottom:1.5px solid var(--border);margin-bottom:22px;gap:0;overflow-x:auto}
+.tab{padding:9px 14px;font-size:12px;font-weight:600;color:var(--text3);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1.5px;cursor:pointer;white-space:nowrap;transition:all .12s;font-family:'Noto Sans KR',sans-serif}
+.tab:hover{color:var(--text2)}
+.tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+
+/* ── FORM ── */
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;max-width:640px}
+.fg-3{grid-template-columns:1fr 1fr 1fr}
+.fg-full{grid-column:1/-1}
+.fgrp{display:flex;flex-direction:column;gap:4px}
+.flabel{font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.3px}
+.finput,.fselect{background:var(--white);border:1.5px solid var(--border2);border-radius:var(--r-sm);padding:8px 11px;font-size:13px;font-family:'Noto Sans KR',sans-serif;color:var(--text);outline:none;width:100%;transition:border-color .12s,box-shadow .12s}
+.finput:focus,.fselect:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,92,248,.1)}
+.fselect{cursor:pointer}
+.finput[type="date"]{cursor:pointer}
+.fnote{font-size:10px;color:var(--text3);margin-top:2px}
+
+/* ── CALENDAR ── */
+.cal-wrap{position:relative}
+.cal-btn{display:flex;align-items:center;gap:7px;background:var(--white);border:1.5px solid var(--border2);border-radius:var(--r-sm);padding:8px 11px;font-size:13px;font-family:'Noto Sans KR',sans-serif;color:var(--text);cursor:pointer;width:100%;text-align:left;outline:none;transition:border-color .12s,box-shadow .12s}
+.cal-btn:hover,.cal-btn.open{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,92,248,.1)}
+.cal-ico{font-size:13px;color:var(--text3)}
+.cal-txt{flex:1}
+.cal-arr{font-size:9px;color:var(--text3)}
+.cal-pop{display:none;position:absolute;top:calc(100% + 5px);left:0;background:var(--white);border:1.5px solid var(--border);border-radius:var(--r);box-shadow:var(--sha-md);z-index:500;padding:12px;width:272px;user-select:none}
+.cal-pop.open{display:block}
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.cal-navbtn{width:26px;height:26px;border:1px solid var(--border);border-radius:var(--r-xs);background:var(--white);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--text2);transition:background .1s}
+.cal-navbtn:hover{background:var(--s2)}
+.cal-ml{font-size:13px;font-weight:700}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cal-dow{text-align:center;font-size:9px;font-weight:700;color:var(--text3);padding:3px 0}
+.cal-d{text-align:center;padding:6px 2px;font-size:12px;border-radius:var(--r-xs);cursor:pointer;color:var(--text);transition:background .1s}
+.cal-d:hover{background:var(--s2)}
+.cal-d.today{font-weight:700;color:var(--blue)}
+.cal-d.sel{background:var(--blue)!important;color:#fff!important;font-weight:700}
+.cal-d.inr{background:var(--blue-l);color:var(--blue)}
+.cal-d.emp{pointer-events:none}
+.cal-d.dis{color:var(--text3);opacity:.4;cursor:not-allowed;pointer-events:none}
+
+/* ── DIVIDER ── */
+.div{height:1px;background:var(--border);margin:16px 0}
+
+/* ── CARD BASE ── */
+.card{background:var(--white);border:1.5px solid var(--border);border-radius:var(--r);box-shadow:var(--sha-xs)}
+.card-hdr{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.card-body{padding:14px 16px}
+.card-title{font-size:13px;font-weight:700}
+
+/* ── AIRLINE BADGE ── */
+.al{font-size:10px;padding:2px 7px;border-radius:var(--r-xs);font-family:'JetBrains Mono',monospace;font-weight:500;letter-spacing:.3px}
+.al-ke{background:var(--ke-bg);color:var(--ke);border:1px solid var(--ke-bd)}
+.al-ga{background:var(--ga-bg);color:var(--ga);border:1px solid var(--ga-bd)}
+.al-xx{background:var(--s3);color:var(--text2);border:1px solid var(--border2)}
+
+/* ── FLIGHT ITEM ── */
+.flight-item{background:var(--white);border:1.5px solid var(--border);border-radius:var(--r);padding:12px 14px;display:flex;align-items:center;gap:10px;transition:all .15s;box-shadow:var(--sha-xs);margin-bottom:7px}
+.flight-item:hover{border-color:var(--border2);box-shadow:var(--sha-sm)}
+.fi-num{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;min-width:56px}
+.fi-route{display:flex;align-items:center;gap:5px;font-size:13px;font-weight:600;min-width:96px}
+.fi-arr{color:var(--text3);font-size:10px}
+.fi-time{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2);min-width:108px}
+.fi-label{flex:1;font-size:12px;color:var(--text2)}
+.fi-del{width:26px;height:26px;border-radius:50%;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:15px;transition:all .12s;flex-shrink:0}
+.fi-del:hover{background:var(--red-bg);color:var(--red)}
+
+/* ── SCHEDULE PICKER PANEL ── */
+.sched-panel{background:var(--s2);border:1.5px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:12px}
+.sched-panel-title{font-size:11px;font-weight:700;color:var(--text2);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.sched-list{display:flex;flex-direction:column;gap:5px;max-height:280px;overflow-y:auto}
+.sched-item{background:var(--white);border:1.5px solid var(--border);border-radius:var(--r-sm);padding:10px 13px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:all .13s}
+.sched-item:hover{border-color:var(--blue-b);background:var(--blue-l)}
+.sched-item.loading{justify-content:center;color:var(--text3);font-size:12px;pointer-events:none;padding:18px}
+.sched-check{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:10px;color:transparent;flex-shrink:0;transition:all .13s}
+.sched-item.picked .sched-check{background:var(--blue);border-color:var(--blue);color:#fff}
+.sched-item.picked{border-color:var(--blue);background:var(--blue-l)}
+
+/* ── ADD FLIGHT FORM ── */
+.add-flight-form{background:var(--s2);border:1.5px dashed var(--border2);border-radius:var(--r);padding:14px;margin-bottom:12px}
+.add-form-title{font-size:11px;font-weight:700;color:var(--text2);margin-bottom:10px}
+
+/* ── TRANSFER ITEM ── */
+.tr-item{background:var(--white);border:1.5px solid var(--border);border-radius:var(--r);padding:12px 14px;display:flex;align-items:flex-start;gap:10px;margin-bottom:7px;box-shadow:var(--sha-xs)}
+.tr-item.disabled{opacity:.42;background:var(--s2)}
+.tr-toggle{position:relative;width:36px;height:20px;background:var(--border2);border-radius:10px;cursor:pointer;transition:background .18s;flex-shrink:0;margin-top:1px}
+.tr-toggle::after{content:'';width:14px;height:14px;background:#fff;border-radius:50%;position:absolute;top:3px;left:3px;transition:transform .18s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.tr-toggle.on{background:var(--ora)}
+.tr-toggle.on::after{transform:translateX(16px)}
+.tr-ico{font-size:16px;flex-shrink:0;margin-top:1px}
+.tr-info{flex:1;min-width:0}
+.tr-title{font-size:13px;font-weight:600;margin-bottom:2px}
+.tr-sub{font-size:11px;color:var(--text2)}
+.tr-del{width:26px;height:26px;border-radius:50%;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:15px;transition:all .12s;flex-shrink:0}
+.tr-del:hover{background:var(--red-bg);color:var(--red)}
+.pgk-badge{font-size:10px;padding:2px 7px;border-radius:var(--r-xs);background:#fef2f2;border:1px solid #fca5a5;color:#b91c1c;white-space:nowrap;flex-shrink:0}
+
+/* ── HOTEL ITEM ── */
+.hotel-item{background:var(--white);border:1.5px solid var(--border);border-radius:var(--r);padding:0;margin-bottom:8px;box-shadow:var(--sha-xs)}
+.hotel-hdr{padding:12px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:background .12s;border-radius:var(--r)}
+.hotel-hdr:has(+.hotel-body.open){border-radius:var(--r) var(--r) 0 0}
+.hotel-hdr:hover{background:var(--s2)}
+.hotel-hdr.active{background:var(--pur-bg)}
+.hotel-check{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:10px;color:transparent;flex-shrink:0;transition:all .13s}
+.hotel-hdr.active .hotel-check{background:var(--pur);border-color:var(--pur);color:#fff}
+.hotel-name{font-size:13px;font-weight:600;flex:1}
+.hotel-sub{font-size:11px;color:var(--text2)}
+.hotel-del{width:26px;height:26px;border-radius:50%;border:none;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:15px;transition:all .12s}
+.hotel-del:hover{background:var(--red-bg);color:var(--red)}
+.hotel-body{border-top:1px solid var(--border);padding:14px;display:none;background:var(--s2)}
+.hotel-body.open{display:block;border-radius:0 0 var(--r) var(--r)}
+.hotel-dates{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.hotel-notes{width:100%}
+
+/* ── SECTION BANNER ── */
+.banner{border-radius:var(--r-sm);padding:9px 13px;font-size:12px;margin-bottom:14px;display:flex;align-items:center;gap:7px;font-weight:500}
+.banner-blue{background:var(--ke-bg);border:1px solid var(--ke-bd);color:var(--ke)}
+.banner-green{background:var(--ga-bg);border:1px solid var(--ga-bd);color:var(--ga)}
+
+/* ── TIMELINE ── */
+.tl{position:relative;padding-left:26px}
+.tl::before{content:'';position:absolute;left:8px;top:6px;bottom:6px;width:1.5px;background:var(--border)}
+.tl-day{margin-bottom:20px;transition:outline-color .12s}
+.tl-day.drag-over{outline:2px dashed var(--blue);outline-offset:6px;border-radius:8px}
+.tl-hdr{display:flex;align-items:center;gap:9px;margin-left:-26px;margin-bottom:9px}
+.tl-dot{width:18px;height:18px;border-radius:50%;background:var(--blue);border:3px solid var(--bg);box-shadow:0 0 0 1.5px var(--blue);flex-shrink:0}
+.tl-dn{font-weight:700;font-size:13px}
+.tl-dd{font-size:11px;color:var(--text2);font-family:'JetBrains Mono',monospace}
+.tl-add-note{margin-left:auto;font-size:10px;background:none;border:1px dashed var(--border2);border-radius:3px;padding:2px 8px;color:var(--text2);cursor:pointer;font-family:'Noto Sans KR',sans-serif}
+.tl-add-note:hover{border-color:var(--blue);color:var(--blue)}
+.tl-evs{display:flex;flex-direction:column;gap:4px}
+.tl-ev{display:flex;align-items:flex-start;gap:9px;padding:9px 12px;background:var(--white);border:1px solid var(--border);border-radius:var(--r-sm);font-size:12px;box-shadow:var(--sha-xs)}
+.tl-ev[draggable]{cursor:grab}
+.tl-ev[draggable]:active{cursor:grabbing}
+.tl-ev.dragging{opacity:.35}
+.tl-t{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text2);min-width:86px;padding-top:1px}
+.tl-t [contenteditable],.tl-tx [contenteditable]{outline:none}
+.tl-t [contenteditable]:focus,.tl-tx [contenteditable]:focus{background:var(--blue-l);border-radius:3px;padding:0 2px}
+.tl-ic{font-size:14px;flex-shrink:0}
+.tl-tx{flex:1;color:var(--text)}
+.tl-ev-del{border:none;background:none;color:var(--text3);cursor:pointer;font-size:12px;flex-shrink:0}
+.tl-ev-del:hover{color:var(--red)}
+.tag{font-size:9px;padding:2px 6px;border-radius:3px;font-weight:700;white-space:nowrap}
+.tag-ke{background:var(--ke-bg);color:var(--ke)}
+.tag-ga{background:var(--ga-bg);color:var(--ga)}
+.tag-car{background:var(--ora-bg);color:var(--ora)}
+.tag-hotel{background:var(--pur-bg);color:var(--pur)}
+.tag-meet{background:#e0f2fe;color:#0369a1}
+
+/* ── EXPORT ── */
+.exp-box{background:var(--white);border:1.5px solid var(--border);border-radius:var(--r);padding:16px;overflow-x:auto;margin-bottom:14px;box-shadow:var(--sha-xs)}
+.exp-table{width:100%;min-width:760px;border-collapse:collapse;font-size:12px;white-space:normal;color:var(--text)}
+.exp-table th,.exp-table td{border:1px solid #c9b98a;padding:7px 9px}
+.exp-title-row td{background:#fdf3b0;font-weight:700;font-size:14px;padding:9px 12px}
+.exp-title-main{text-align:left}
+.exp-title-dur{text-align:right;color:#c0392b;white-space:nowrap}
+.exp-hdr-row th{background:#fdf3b0;font-weight:700;text-align:center;font-size:11px}
+.exp-no{text-align:center;font-weight:700;vertical-align:middle;width:1%;white-space:nowrap}
+.exp-date{text-align:center;vertical-align:middle;font-weight:600;white-space:nowrap;width:1%}
+.exp-dow{font-size:11px;font-weight:400;color:var(--text2)}
+.exp-time{text-align:center;vertical-align:middle;white-space:nowrap;font-family:'JetBrains Mono',monospace;width:1%}
+.exp-activity{text-align:left;vertical-align:middle}
+.exp-activity-text{flex:1}
+.exp-flight-cell{text-align:center;vertical-align:middle;font-family:'JetBrains Mono',monospace;font-weight:600;white-space:nowrap;width:110px}
+.exp-hotel-cell{text-align:center;vertical-align:middle;font-size:11px;width:110px}
+.exp-row-move td{background:#fdecc8}
+.exp-row-flight td{background:#dde3f5}
+.exp-row-ga td{background:#dcf3ea}
+.exp-foot-row td{background:var(--s2);text-align:center;color:var(--text3);font-size:11px}
+
+/* ── PRINT: 출력 표만 가로모드 1장으로 인쇄 ── */
+@page{size:landscape;margin:10mm}
+@media print{
+  body *{visibility:hidden}
+  .exp-box,.exp-box *{visibility:visible}
+  .exp-box{position:absolute;left:0;top:0;width:100%;border:none;box-shadow:none;padding:0;overflow:visible;transform-origin:top left}
+  .exp-table{font-size:10px}
+  .exp-table th,.exp-table td{padding:4px 6px}
+  .exp-title-row td{font-size:12px;padding:5px 8px}
+  .no-print{display:none!important}
+}
+
+/* ── BUTTONS ── */
+.btn-row{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:18px}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 15px;border-radius:var(--r-sm);font-size:12px;font-weight:700;font-family:'Noto Sans KR',sans-serif;cursor:pointer;border:none;transition:all .12s}
+.btn-primary{background:var(--blue);color:#fff;box-shadow:0 1px 3px rgba(26,92,248,.3)}
+.btn-primary:hover{background:#1447b3}
+.btn-secondary{background:var(--white);border:1.5px solid var(--border2);color:var(--text2)}
+.btn-secondary:hover{background:var(--s2)}
+.btn-green{background:#059669;color:#fff}
+.btn-green:hover{background:var(--grn)}
+.btn-add{background:var(--s2);border:1.5px dashed var(--border2);color:var(--text2);border-radius:var(--r-sm);padding:8px 13px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:all .12s;font-family:'Noto Sans KR',sans-serif}
+.btn-add:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-l)}
+.btn-sm{padding:5px 10px;font-size:11px}
+
+/* ── NOTIF ── */
+.notif{position:fixed;bottom:20px;right:20px;background:var(--text);color:#fff;padding:9px 14px;border-radius:var(--r-sm);font-size:12px;font-weight:600;display:none;z-index:999;box-shadow:var(--sha-md);animation:slideUp .22s ease}
+@keyframes slideUp{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
+
+/* ── MODAL ── */
+.modal-bg{position:fixed;inset:0;background:rgba(15,25,35,.45);z-index:800;display:none;align-items:center;justify-content:center}
+.modal-bg.open{display:flex}
+.modal{background:var(--white);border-radius:var(--r);box-shadow:var(--sha-md);width:540px;max-width:calc(100vw - 32px);max-height:80vh;display:flex;flex-direction:column}
+.modal-hdr{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:14px;font-weight:700}
+.modal-close{width:28px;height:28px;border:none;background:none;cursor:pointer;border-radius:50%;font-size:16px;color:var(--text3);display:flex;align-items:center;justify-content:center;transition:background .1s}
+.modal-close:hover{background:var(--s2)}
+.modal-body{padding:16px 18px;overflow-y:auto;flex:1}
+.modal-foot{padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:7px;justify-content:flex-end}
+
+/* ── SPINNER ── */
+.spin{display:inline-block;width:16px;height:16px;border:2px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── INLINE SCHEDULE PICKER ── */
+.fi-wrap{margin-bottom:7px}
+.fi-card{background:var(--white);border:1.5px solid var(--border);border-radius:var(--r);box-shadow:var(--sha-xs);overflow:hidden;transition:border-color .15s}
+.fi-card.expanded{border-color:var(--blue-b)}
+.fi-row{padding:11px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:background .12s;user-select:none}
+.fi-row:hover{background:var(--s2)}
+.fi-card.expanded .fi-row{background:var(--blue-l)}
+.fi-expand-icon{font-size:11px;color:var(--text3);transition:transform .15s;flex-shrink:0}
+.fi-card.expanded .fi-expand-icon{transform:rotate(180deg);color:var(--blue)}
+.fi-picker{display:none;border-top:1px solid var(--border);padding:10px 12px;background:var(--s2)}
+.fi-card.expanded .fi-picker{display:block}
+.fi-picker-label{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text3);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.fi-sched-grid{display:flex;flex-direction:column;gap:5px}
+.fi-sched-row{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--white);border:1.5px solid var(--border);border-radius:var(--r-sm);cursor:pointer;transition:all .12s}
+.fi-sched-row:hover{border-color:var(--blue-b);background:var(--blue-l)}
+.fi-sched-row.active{border-color:var(--blue);background:var(--blue-l)}
+.fi-sched-check{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:10px;color:transparent;flex-shrink:0;transition:all .12s}
+.fi-sched-row.active .fi-sched-check{background:var(--blue);border-color:var(--blue);color:#fff}
+.fi-sched-num{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;min-width:60px}
+.fi-sched-time{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2);min-width:110px}
+.fi-sched-note{font-size:11px;color:var(--text3);flex:1}
+.fi-no-sched{font-size:12px;color:var(--text3);padding:10px 0;text-align:center}
+
+/* ── HOTEL DATE PICKER ── */
+.hcal-wrap{position:relative}
+.hcal-btn{display:flex;align-items:center;gap:6px;background:var(--white);border:1.5px solid var(--border2);border-radius:var(--r-sm);padding:7px 10px;font-size:12px;font-family:'Noto Sans KR',sans-serif;color:var(--text);cursor:pointer;width:100%;text-align:left;outline:none;transition:border-color .12s,box-shadow .12s}
+.hcal-btn:hover,.hcal-btn.open{border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,92,248,.1)}
+.hcal-btn-ico{font-size:12px;color:var(--text3)}
+.hcal-btn-txt{flex:1;font-size:12px}
+.hcal-pop{display:none;position:absolute;top:calc(100% + 4px);left:0;background:var(--white);border:1.5px solid var(--border);border-radius:var(--r);box-shadow:var(--sha-md);z-index:600;padding:11px;width:256px;user-select:none}
+.hcal-pop.open{display:block}
+</style>
+</head>
+<body>
+<div class="notif" id="notif"></div>
+
+<!-- MODAL: 항공편 추가 -->
+<div class="modal-bg" id="modal-flight">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title" id="mf-title">항공편 추가</div>
+      <button class="modal-close" onclick="closeModal('modal-flight')">✕</button>
+    </div>
+    <div class="modal-body">
+      <!-- Step 1: 항공사 선택 -->
+      <div id="mf-step1">
+        <div class="add-form-title">1단계 — 항공사 및 구간 선택</div>
+        <div class="fg" style="max-width:100%;margin-bottom:10px;grid-template-columns:150px 1fr">
+          <div class="fgrp">
+            <label class="flabel">항공사</label>
+            <select class="fselect" id="mf-airline" onchange="onMfAirlineChange()">
+              <option value="">선택</option>
+              <option value="KE">🇰🇷 대한항공 (KE)</option>
+              <option value="OZ">🇰🇷 아시아나항공 (OZ)</option>
+              <option value="GA">🇮🇩 가루다 인도네시아 (GA)</option>
+              <option value="SQ">🇸🇬 싱가포르항공 (SQ)</option>
+              <option value="TG">🇹🇭 타이항공 (TG)</option>
+              <option value="NH">🇯🇵 전일본공수 (NH)</option>
+              <option value="JL">🇯🇵 일본항공 (JL)</option>
+              <option value="MH">🇲🇾 말레이시아항공 (MH)</option>
+              <option value="CX">🇭🇰 캐세이퍼시픽 (CX)</option>
+              <option value="EK">🇦🇪 에미레이트 (EK)</option>
+              <option value="QR">🇶🇦 카타르항공 (QR)</option>
+              <option value="XX">기타 (직접 입력)</option>
+            </select>
+          </div>
+          <div class="fgrp">
+            <label class="flabel">출발지 → 목적지 (IATA)</label>
+            <div style="display:flex;align-items:center;gap:8px">
+              <input class="finput" id="mf-dep" title="출발지 (IATA)" placeholder="ICN" maxlength="3" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+              <button type="button" class="cal-navbtn" onclick="swapMfRoute()" title="출발지 ↔ 목적지 교환" style="flex-shrink:0;width:28px;height:28px;font-size:13px">⇄</button>
+              <input class="finput" id="mf-arr" title="목적지 (IATA)" placeholder="CGK" maxlength="3" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+            </div>
+          </div>
+        </div>
+        <div class="fg fg-3" style="max-width:100%;margin-bottom:10px">
+          <div class="fgrp">
+            <label class="flabel">출발일</label>
+            <input class="finput" type="date" id="mf-date">
+          </div>
+          <div class="fgrp">
+            <label class="flabel">도착일</label>
+            <input class="finput" type="date" id="mf-arr-date">
+          </div>
+          <div class="fgrp" style="align-self:end">
+            <button class="btn btn-secondary" onclick="searchSchedule()" id="mf-search-btn" style="width:100%">🔍 스케줄 검색</button>
+          </div>
+        </div>
+        <!-- 스케줄 검색 결과 -->
+        <div id="mf-results" style="display:none">
+          <div class="add-form-title" style="margin-top:8px">2단계 — 운항 편 선택 <span style="font-weight:400;color:var(--text3)" id="mf-result-count"></span></div>
+          <div class="sched-list" id="mf-sched-list"></div>
+        </div>
+        <!-- 직접 입력 -->
+        <div id="mf-manual" style="display:none">
+          <div class="add-form-title" style="margin-top:8px">직접 입력</div>
+          <div class="fg" style="max-width:100%">
+            <div class="fgrp">
+              <label class="flabel">편명</label>
+              <input class="finput" id="mf-num" placeholder="XX 123">
+            </div>
+            <div class="fgrp">
+              <label class="flabel">출발 시간</label>
+              <input class="finput" type="time" id="mf-dep-t">
+            </div>
+            <div class="fgrp">
+              <label class="flabel">도착 시간</label>
+              <input class="finput" type="time" id="mf-arr-t">
+            </div>
+            <div class="fgrp">
+              <label class="flabel">메모</label>
+              <input class="finput" id="mf-note" placeholder="비고">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('modal-flight')">취소</button>
+      <button class="btn btn-primary" onclick="confirmAddFlight()" id="mf-confirm" disabled>추가</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: 차량 추가 -->
+<div class="modal-bg" id="modal-transfer">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title">차량 배차 추가</div>
+      <button class="modal-close" onclick="closeModal('modal-transfer')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg" style="max-width:100%">
+        <div class="fgrp">
+          <label class="flabel">출발지</label>
+          <input class="finput" id="mt-from" placeholder="예: 호텔">
+        </div>
+        <div class="fgrp">
+          <label class="flabel">도착지</label>
+          <input class="finput" id="mt-to" placeholder="예: 미팅 장소">
+        </div>
+        <div class="fgrp fg-full">
+          <label class="flabel">상세 설명</label>
+          <input class="finput" id="mt-sub" placeholder="예: 오전 9시, 로비 픽업">
+        </div>
+        <div class="fgrp">
+          <label class="flabel">날짜</label>
+          <input class="finput" type="date" id="mt-date">
+        </div>
+        <div class="fgrp">
+          <label class="flabel">시간</label>
+          <div style="display:flex;gap:6px">
+            <select class="fselect" id="mt-ampm" style="flex:0 0 68px">
+              <option value="AM">오전</option>
+              <option value="PM">오후</option>
+            </select>
+            <select class="fselect" id="mt-hour" style="flex:0 0 60px">
+              <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+              <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+              <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+              <option value="10">10</option><option value="11">11</option><option value="12">12</option>
+            </select>
+            <select class="fselect" id="mt-min" style="flex:0 0 60px">
+              <option value="0">00</option><option value="10">10</option><option value="20">20</option>
+              <option value="30">30</option><option value="40">40</option><option value="50">50</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('modal-transfer')">취소</button>
+      <button class="btn btn-primary" onclick="confirmAddTransfer()">추가</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: 호텔 추가 -->
+<div class="modal-bg" id="modal-hotel">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title">호텔 추가</div>
+      <button class="modal-close" onclick="closeModal('modal-hotel')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg" style="max-width:100%">
+        <div class="fgrp fg-full">
+          <label class="flabel">저장된 호텔에서 선택</label>
+          <select class="fselect" id="mh-saved" onchange="pickSavedHotel(this.value)">
+            <option value="">-- 새 호텔 직접 입력 --</option>
+          </select>
+        </div>
+        <div class="fgrp fg-full">
+          <label class="flabel">호텔명</label>
+          <input class="finput" id="mh-name" placeholder="예: Fairmont Jakarta">
+        </div>
+        <div class="fgrp">
+          <label class="flabel">도시</label>
+          <input class="finput" id="mh-city" placeholder="예: 자카르타">
+        </div>
+        <div class="fgrp">
+          <label class="flabel">체크인</label>
+          <input class="finput" type="date" id="mh-cin">
+        </div>
+        <div class="fgrp">
+          <label class="flabel">체크아웃</label>
+          <input class="finput" type="date" id="mh-cout">
+        </div>
+        <div class="fgrp fg-full">
+          <label class="flabel">메모 / 특이사항</label>
+          <input class="finput" id="mh-note" placeholder="예: Late checkout 요청, 조식 포함">
+        </div>
+
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('modal-hotel')">취소</button>
+      <button class="btn btn-primary" onclick="confirmAddHotel()">추가</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: 항공편 API 설정 -->
+<div class="modal-bg" id="modal-api">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title">실시간 항공편 API 설정</div>
+      <button class="modal-close" onclick="closeModal('modal-api')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="sec-sub" style="margin-bottom:10px">
+        airlabs.co 에서 무료 API 키(api_key)를 발급받아 아래에 입력하면 항공편 스케줄을 실시간으로 조회합니다.
+        키가 없거나 조회에 실패하면 자동으로 예시 스케줄 데이터를 사용합니다.
+      </div>
+      <div class="fgrp fg-full">
+        <label class="flabel">AirLabs API Key</label>
+        <input class="finput" id="api-key-input" placeholder="api_key 값 붙여넣기">
+      </div>
+      <div style="font-size:12px;color:var(--text3);margin-top:8px" id="api-key-status"></div>
+
+      <div class="fgrp fg-full" style="margin-top:14px">
+        <label class="flabel">공유 캐시 프록시 URL (선택)</label>
+        <input class="finput" id="cache-proxy-input" placeholder="예: https://flight-cache-proxy.onrender.com">
+      </div>
+      <div style="font-size:12px;color:var(--text3);margin-top:8px" id="cache-proxy-status"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="clearApiSettings()">모두 삭제</button>
+      <button class="btn btn-primary" onclick="saveApiSettings()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<header class="hdr">
+  <div class="hdr-logo"><div class="hdr-logo-box">✈</div>TripPlanner</div>
+  <div class="hdr-sep"></div>
+  <div class="hdr-trip">출장 일정 관리 시스템</div>
+  <div class="hdr-r">
+    <span id="hdr-dates" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2)"></span>
+    <span class="pill" id="hdr-badge" style="display:none"></span>
+    <button class="btn btn-secondary" onclick="startNewTrip()" style="padding:6px 10px;font-size:12px">🆕 새 일정 시작</button>
+    <button class="btn btn-secondary" onclick="openApiSettings()" style="padding:6px 10px;font-size:12px">⚙ 항공편 API 설정</button>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div>
+      <div class="sb-label">진행 단계</div>
+      <div class="step-list">
+        <div class="step active" onclick="goTab('setup')" id="step-setup"><div class="snum" id="sn-setup">1</div><div class="slabel">기본 정보</div></div>
+        <div class="step" onclick="goTab('flight')" id="step-flight"><div class="snum" id="sn-flight">2</div><div class="slabel">항공편</div></div>
+        <div class="step" onclick="goTab('transfer')" id="step-transfer"><div class="snum" id="sn-transfer">3</div><div class="slabel">차량 배차</div></div>
+        <div class="step" onclick="goTab('hotel')" id="step-hotel"><div class="snum" id="sn-hotel">4</div><div class="slabel">호텔</div></div>
+        <div class="step" onclick="goTab('timeline')" id="step-timeline"><div class="snum" id="sn-timeline">5</div><div class="slabel">일정표</div></div>
+        <div class="step" onclick="goTab('export')" id="step-export"><div class="snum" id="sn-export">6</div><div class="slabel">문서 출력</div></div>
+      </div>
+    </div>
+    <div>
+      <div class="sb-label">현황 요약</div>
+      <div class="sum-card">
+        <div class="sum-row"><span class="sum-k">출발일</span><span class="sum-v" id="sum-s">-</span></div>
+        <div class="sum-row"><span class="sum-k">귀국일</span><span class="sum-v" id="sum-e">-</span></div>
+        <div class="sum-row"><span class="sum-k">목적지</span><span class="sum-v" id="sum-d">-</span></div>
+        <div class="sum-sep"></div>
+        <div class="sum-row"><span class="sum-k">✈ 항공편</span><span class="sum-chip" id="sum-f">0편</span></div>
+        <div class="sum-row"><span class="sum-k">🚗 차량</span><span class="sum-chip" id="sum-c">0건</span></div>
+        <div class="sum-row"><span class="sum-k">🏨 호텔</span><span class="sum-chip" id="sum-h">0건</span></div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="tabs">
+      <button class="tab active" onclick="goTab('setup')" data-tab="setup">📋 기본 정보</button>
+      <button class="tab" onclick="goTab('flight')" data-tab="flight">✈ 항공편</button>
+      <button class="tab" onclick="goTab('transfer')" data-tab="transfer">🚗 차량 배차</button>
+      <button class="tab" onclick="goTab('hotel')" data-tab="hotel">🏨 호텔</button>
+      <button class="tab" onclick="goTab('timeline')" data-tab="timeline">📅 일정표</button>
+      <button class="tab" onclick="goTab('export')" data-tab="export">📄 출력</button>
+    </div>
+
+    <!-- 1. 기본 정보 -->
+    <div class="sec active" id="tab-setup">
+      <div class="sec-h">출장 기본 정보</div>
+      <div class="sec-sub">출장자 정보와 기간을 입력하면 항공편 스케줄이 자동 로드됩니다</div>
+      <div class="fg">
+        <div class="fgrp"><label class="flabel">출장자 이름</label><input class="finput" id="f-name" value="장승호" oninput="updateSummary()"></div>
+        <div class="fgrp"><label class="flabel">소속 / 직책</label><input class="finput" id="f-dept" value="경영지원실 엔지니어링팀 책임" oninput="updateSummary()"></div>
+        <div class="fgrp">
+          <label class="flabel">출발일</label>
+          <div class="cal-wrap" id="cw-s"><button class="cal-btn" id="cb-s" onclick="toggleCal('s',event)"><span class="cal-ico">📅</span><span class="cal-txt" id="ct-s">날짜 선택</span><span class="cal-arr">▾</span></button><div class="cal-pop" id="cal-s"></div></div>
+        </div>
+        <div class="fgrp">
+          <label class="flabel">귀국일</label>
+          <div class="cal-wrap" id="cw-e"><button class="cal-btn" id="cb-e" onclick="toggleCal('e',event)"><span class="cal-ico">📅</span><span class="cal-txt" id="ct-e">날짜 선택</span><span class="cal-arr">▾</span></button><div class="cal-pop" id="cal-e"></div></div>
+        </div>
+        <div class="fgrp fg-full">
+          <label class="flabel">출장 국가 및 주요 도시</label>
+          <div style="display:flex;gap:10px">
+            <select class="fselect" id="f-country" style="max-width:200px" onchange="onCountryChange()">
+              <option value="인도네시아" selected>🇮🇩 인도네시아</option>
+              <option value="싱가포르">🇸🇬 싱가포르</option>
+              <option value="말레이시아">🇲🇾 말레이시아</option>
+              <option value="베트남">🇻🇳 베트남</option>
+              <option value="태국">🇹🇭 태국</option>
+              <option value="필리핀">🇵🇭 필리핀</option>
+              <option value="일본">🇯🇵 일본</option>
+              <option value="중국">🇨🇳 중국</option>
+              <option value="미국">🇺🇸 미국</option>
+            </select>
+            <select class="fselect" id="f-city" onchange="updateSummary()">
+              <option value="자카르타">자카르타 (Jakarta · CGK)</option>
+              <option value="발리">발리 (Bali · DPS)</option>
+              <option value="수라바야">수라바야 (Surabaya · SUB)</option>
+              <option value="방카">방카 (Bangka · PGK)</option>
+            </select>
+          </div>
+        </div>
+        <div class="fgrp fg-full"><label class="flabel">출장 목적</label><input class="finput" id="f-purpose" value="THEP mill plant 운영 현안 협의 및 설비 점검, ABM 프로젝트 협의"></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="saveSetup()">저장 후 항공편 선택 →</button>
+      </div>
+    </div>
+
+    <!-- 2. 항공편 -->
+    <div class="sec" id="tab-flight">
+      <div class="sec-h">항공편</div>
+      <div class="sec-sub">국가/도시를 선택하면 해당 노선 스케줄이 자동 로드됩니다. 편을 선택하거나 직접 추가하세요.</div>
+      <div id="flight-banner"></div>
+      <div id="flight-list"></div>
+      <button class="btn-add" onclick="openAddFlight()">+ 항공편 추가</button>
+      <div class="div"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="saveFlightStep()">저장 후 다음: 차량 배차 →</button>
+        <button class="btn btn-secondary" onclick="goTab('setup')">← 이전</button>
+      </div>
+    </div>
+
+    <!-- 3. 차량 배차 -->
+    <div class="sec" id="tab-transfer">
+      <div class="sec-h">차량 배차</div>
+      <div class="sec-sub">구간별 배차를 설정하세요.</div>
+      <div id="transfer-banner"></div>
+      <div id="transfer-list"></div>
+      <button class="btn-add" onclick="openAddTransfer()">+ 배차 구간 추가</button>
+      <div class="div"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="saveTransferStep()">저장 후 다음: 호텔 →</button>
+        <button class="btn btn-secondary" onclick="goTab('flight')">← 이전</button>
+      </div>
+    </div>
+
+    <!-- 4. 호텔 -->
+    <div class="sec" id="tab-hotel">
+      <div class="sec-h">호텔 예약</div>
+      <div class="sec-sub">체크인 · 체크아웃 날짜를 입력하세요.</div>
+      <div id="hotel-list"></div>
+      <button class="btn-add" onclick="openAddHotel()">+ 호텔 추가</button>
+      <div class="div"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="saveHotelStep()">저장 후 다음: 일정표 →</button>
+        <button class="btn btn-secondary" onclick="goTab('transfer')">← 이전</button>
+      </div>
+    </div>
+
+    <!-- 5. 타임라인 -->
+    <div class="sec" id="tab-timeline">
+      <div class="sec-h">최종 일정표</div>
+      <div class="sec-sub">선택된 항목이 날짜별로 정리됩니다</div>
+      <div class="tl" id="tl-view"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="saveTimelineStep()">저장 후 다음: 문서 출력 →</button>
+        <button class="btn btn-secondary" onclick="goTab('hotel')">← 이전</button>
+      </div>
+    </div>
+
+    <!-- 6. 출력 -->
+    <div class="sec" id="tab-export">
+      <div class="sec-h">문서 출력</div>
+      <div class="sec-sub">완성된 출장 일정을 복사하거나 인쇄하세요</div>
+      <div class="exp-box" id="exp-box"></div>
+      <div class="btn-row">
+        <button class="btn btn-green" onclick="copyExp()">📋 클립보드 복사</button>
+        <button class="btn btn-secondary" onclick="exportExcel()">📊 엑셀로 저장</button>
+        <button class="btn btn-secondary" onclick="window.print()">🖨 인쇄</button>
+        <button class="btn btn-secondary" onclick="goTab('timeline')">← 이전</button>
+      </div>
+      <div class="btn-row" style="margin-top:8px">
+        <button class="btn btn-secondary" onclick="downloadStateJson()">💾 JSON으로 저장</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('json-file-input').click()">📂 JSON 불러오기</button>
+        <input type="file" id="json-file-input" accept="application/json" style="display:none" onchange="uploadStateJson(this.files[0])">
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ============================================================
+// CONSTANTS
+// ============================================================
+const DOWS=['일','월','화','수','목','금','토'];
+const MONTHS=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+
+// 국가 → {cities, iata(출발공항), mainAirline, routes}
+const COUNTRY_DATA = {
+  '인도네시아':{
+    cities:['자카르타 (Jakarta · CGK)|자카르타|CGK','발리 (Bali · DPS)|발리|DPS','수라바야 (Surabaya · SUB)|수라바야|SUB','방카 (Bangka · PGK)|방카|PGK|CGK'],
+    mainAirline:'KE', routes:[{dep:'ICN',arr:'CGK'},{dep:'CGK',arr:'ICN'}]
+  },
+  '싱가포르':{cities:['싱가포르 (Singapore · SIN)|싱가포르|SIN'],mainAirline:'SQ',routes:[{dep:'ICN',arr:'SIN'},{dep:'SIN',arr:'ICN'}]},
+  '말레이시아':{cities:['쿠알라룸푸르 (KL · KUL)|쿠알라룸푸르|KUL','코타키나발루 (Kota Kinabalu · BKI)|코타키나발루|BKI'],mainAirline:'MH',routes:[{dep:'ICN',arr:'KUL'},{dep:'KUL',arr:'ICN'}]},
+  '베트남':{cities:['하노이 (Hanoi · HAN)|하노이|HAN','호치민 (HCMC · SGN)|호치민|SGN'],mainAirline:'KE',routes:[{dep:'ICN',arr:'HAN'},{dep:'HAN',arr:'ICN'}]},
+  '태국':{cities:['방콕 (Bangkok · BKK)|방콕|BKK','치앙마이 (Chiang Mai · CNX)|치앙마이|CNX'],mainAirline:'TG',routes:[{dep:'ICN',arr:'BKK'},{dep:'BKK',arr:'ICN'}]},
+  '필리핀':{cities:['마닐라 (Manila · MNL)|마닐라|MNL','세부 (Cebu · CEB)|세부|CEB'],mainAirline:'KE',routes:[{dep:'ICN',arr:'MNL'},{dep:'MNL',arr:'ICN'}]},
+  '일본':{cities:['도쿄 (Tokyo · NRT)|도쿄|NRT','오사카 (Osaka · KIX)|오사카|KIX','후쿠오카 (Fukuoka · FUK)|후쿠오카|FUK'],mainAirline:'NH',routes:[{dep:'ICN',arr:'NRT'},{dep:'NRT',arr:'ICN'}]},
+  '중국':{cities:['베이징 (Beijing · PEK)|베이징|PEK','상하이 (Shanghai · PVG)|상하이|PVG'],mainAirline:'KE',routes:[{dep:'ICN',arr:'PEK'},{dep:'PEK',arr:'ICN'}]},
+  '미국':{cities:['뉴욕 (New York · JFK)|뉴욕|JFK','LA (Los Angeles · LAX)|LA|LAX'],mainAirline:'KE',routes:[{dep:'ICN',arr:'JFK'},{dep:'JFK',arr:'ICN'}]},
+};
+
+// 항공사별 ICN 발 주요 노선 편명 시뮬레이션 (실제 API 연동 시 교체)
+const MOCK_SCHEDULES = {
+  'KE_ICN_CGK':[
+    {num:'KE 435',dep:'ICN',arr:'CGK',depT:'09:40',arrT:'15:05'},
+    {num:'KE 437',dep:'ICN',arr:'CGK',depT:'15:05',arrT:'20:20'},
+  ],
+  'KE_CGK_ICN':[
+    {num:'KE 436',dep:'CGK',arr:'ICN',depT:'17:20',arrT:'07:05+1'},
+    {num:'KE 438',dep:'CGK',arr:'ICN',depT:'21:50',arrT:'07:05+1'},
+  ],
+  'GA_ICN_CGK':[
+    {num:'GA 878',dep:'ICN',arr:'CGK',depT:'09:05',arrT:'14:35'},
+  ],
+  'GA_CGK_ICN':[
+    {num:'GA 879',dep:'CGK',arr:'ICN',depT:'23:05',arrT:'08:20+1'},
+  ],
+  'GA_CGK_PGK':[
+    {num:'GA 134',dep:'CGK',arr:'PGK',depT:'07:00',arrT:'08:10'},
+    {num:'GA 136',dep:'CGK',arr:'PGK',depT:'10:20',arrT:'11:40'},
+    {num:'GA 138',dep:'CGK',arr:'PGK',depT:'15:30',arrT:'16:50'},
+  ],
+  'GA_PGK_CGK':[
+    {num:'GA 135',dep:'PGK',arr:'CGK',depT:'08:40',arrT:'09:55'},
+    {num:'GA 137',dep:'PGK',arr:'CGK',depT:'12:25',arrT:'13:40'},
+    {num:'GA 139',dep:'PGK',arr:'CGK',depT:'17:30',arrT:'18:45'},
+  ],
+  'KE_ICN_DPS':[
+    {num:'KE 629',dep:'ICN',arr:'DPS',depT:'14:20',arrT:'20:15'},
+  ],
+  'KE_DPS_ICN':[
+    {num:'KE 630',dep:'DPS',arr:'ICN',depT:'22:00',arrT:'06:45+1'},
+  ],
+  'GA_ICN_DPS':[
+    {num:'GA 866',dep:'ICN',arr:'DPS',depT:'19:20',arrT:'01:10+1'},
+  ],
+  'GA_DPS_ICN':[
+    {num:'GA 867',dep:'DPS',arr:'ICN',depT:'02:20',arrT:'10:35'},
+  ],
+  'SQ_ICN_SIN':[
+    {num:'SQ 607',dep:'ICN',arr:'SIN',depT:'10:30',arrT:'16:05'},
+    {num:'SQ 601',dep:'ICN',arr:'SIN',depT:'22:45',arrT:'04:25+1'},
+  ],
+  'SQ_SIN_ICN':[
+    {num:'SQ 608',dep:'SIN',arr:'ICN',depT:'18:10',arrT:'01:45+1'},
+    {num:'SQ 602',dep:'SIN',arr:'ICN',depT:'08:00',arrT:'15:30'},
+  ],
+  'KE_ICN_HAN':[
+    {num:'KE 681',dep:'ICN',arr:'HAN',depT:'09:00',arrT:'11:10'},
+    {num:'KE 683',dep:'ICN',arr:'HAN',depT:'14:30',arrT:'16:40'},
+  ],
+  'KE_HAN_ICN':[
+    {num:'KE 682',dep:'HAN',arr:'ICN',depT:'12:30',arrT:'19:30'},
+    {num:'KE 684',dep:'HAN',arr:'ICN',depT:'17:50',arrT:'00:50+1'},
+  ],
+  'KE_ICN_SGN':[
+    {num:'KE 685',dep:'ICN',arr:'SGN',depT:'09:30',arrT:'13:00'},
+    {num:'KE 687',dep:'ICN',arr:'SGN',depT:'18:45',arrT:'22:15'},
+  ],
+  'KE_SGN_ICN':[
+    {num:'KE 686',dep:'SGN',arr:'ICN',depT:'14:20',arrT:'21:40'},
+    {num:'KE 688',dep:'SGN',arr:'ICN',depT:'23:30',arrT:'06:50+1'},
+  ],
+  'TG_ICN_BKK':[
+    {num:'TG 659',dep:'ICN',arr:'BKK',depT:'01:05',arrT:'05:05'},
+    {num:'TG 657',dep:'ICN',arr:'BKK',depT:'23:55',arrT:'03:55+1'},
+  ],
+  'TG_BKK_ICN':[
+    {num:'TG 658',dep:'BKK',arr:'ICN',depT:'23:40',arrT:'07:05+1'},
+    {num:'TG 660',dep:'BKK',arr:'ICN',depT:'10:15',arrT:'18:00'},
+  ],
+  'KE_ICN_MNL':[
+    {num:'KE 623',dep:'ICN',arr:'MNL',depT:'08:35',arrT:'11:20'},
+    {num:'KE 625',dep:'ICN',arr:'MNL',depT:'19:50',arrT:'22:35'},
+  ],
+  'KE_MNL_ICN':[
+    {num:'KE 624',dep:'MNL',arr:'ICN',depT:'12:30',arrT:'17:00'},
+    {num:'KE 626',dep:'MNL',arr:'ICN',depT:'23:45',arrT:'04:20+1'},
+  ],
+  'KE_ICN_CEB':[
+    {num:'KE 631',dep:'ICN',arr:'CEB',depT:'09:05',arrT:'12:10'},
+  ],
+  'KE_CEB_ICN':[
+    {num:'KE 632',dep:'CEB',arr:'ICN',depT:'13:30',arrT:'18:15'},
+  ],
+  'NH_ICN_NRT':[
+    {num:'NH 867',dep:'ICN',arr:'NRT',depT:'09:50',arrT:'12:30'},
+    {num:'NH 869',dep:'ICN',arr:'NRT',depT:'13:55',arrT:'16:40'},
+    {num:'NH 871',dep:'ICN',arr:'NRT',depT:'17:50',arrT:'20:40'},
+  ],
+  'NH_NRT_ICN':[
+    {num:'NH 868',dep:'NRT',arr:'ICN',depT:'08:00',arrT:'10:40'},
+    {num:'NH 870',dep:'NRT',arr:'ICN',depT:'13:00',arrT:'15:45'},
+    {num:'NH 872',dep:'NRT',arr:'ICN',depT:'19:30',arrT:'22:10'},
+  ],
+  'KE_ICN_KIX':[
+    {num:'KE 723',dep:'ICN',arr:'KIX',depT:'09:30',arrT:'11:15'},
+    {num:'KE 725',dep:'ICN',arr:'KIX',depT:'14:00',arrT:'15:45'},
+    {num:'KE 727',dep:'ICN',arr:'KIX',depT:'17:30',arrT:'19:15'},
+  ],
+  'KE_KIX_ICN':[
+    {num:'KE 724',dep:'KIX',arr:'ICN',depT:'12:30',arrT:'15:00'},
+    {num:'KE 726',dep:'KIX',arr:'ICN',depT:'16:30',arrT:'19:00'},
+    {num:'KE 728',dep:'KIX',arr:'ICN',depT:'20:15',arrT:'22:45'},
+  ],
+  'KE_ICN_FUK':[
+    {num:'KE 783',dep:'ICN',arr:'FUK',depT:'07:40',arrT:'09:00'},
+    {num:'KE 785',dep:'ICN',arr:'FUK',depT:'14:00',arrT:'15:20'},
+  ],
+  'KE_FUK_ICN':[
+    {num:'KE 784',dep:'FUK',arr:'ICN',depT:'10:00',arrT:'11:25'},
+    {num:'KE 786',dep:'FUK',arr:'ICN',depT:'16:20',arrT:'17:45'},
+  ],
+  'KE_ICN_PEK':[
+    {num:'KE 851',dep:'ICN',arr:'PEK',depT:'09:30',arrT:'11:00'},
+    {num:'KE 853',dep:'ICN',arr:'PEK',depT:'14:15',arrT:'15:45'},
+    {num:'KE 855',dep:'ICN',arr:'PEK',depT:'18:30',arrT:'20:00'},
+  ],
+  'KE_PEK_ICN':[
+    {num:'KE 852',dep:'PEK',arr:'ICN',depT:'12:20',arrT:'15:50'},
+    {num:'KE 854',dep:'PEK',arr:'ICN',depT:'16:45',arrT:'20:15'},
+    {num:'KE 856',dep:'PEK',arr:'ICN',depT:'21:00',arrT:'00:30+1'},
+  ],
+  'KE_ICN_PVG':[
+    {num:'KE 891',dep:'ICN',arr:'PVG',depT:'09:00',arrT:'10:30'},
+    {num:'KE 893',dep:'ICN',arr:'PVG',depT:'13:30',arrT:'15:00'},
+    {num:'KE 895',dep:'ICN',arr:'PVG',depT:'18:00',arrT:'19:30'},
+  ],
+  'KE_PVG_ICN':[
+    {num:'KE 892',dep:'PVG',arr:'ICN',depT:'11:40',arrT:'15:00'},
+    {num:'KE 894',dep:'PVG',arr:'ICN',depT:'16:10',arrT:'19:30'},
+    {num:'KE 896',dep:'PVG',arr:'ICN',depT:'20:30',arrT:'23:50'},
+  ],
+  'KE_ICN_JFK':[
+    {num:'KE 081',dep:'ICN',arr:'JFK',depT:'10:30',arrT:'10:55'},
+    {num:'KE 085',dep:'ICN',arr:'JFK',depT:'17:30',arrT:'18:00'},
+  ],
+  'KE_JFK_ICN':[
+    {num:'KE 082',dep:'JFK',arr:'ICN',depT:'13:00',arrT:'17:10+1'},
+    {num:'KE 086',dep:'JFK',arr:'ICN',depT:'00:01',arrT:'04:15+1'},
+  ],
+  'KE_ICN_LAX':[
+    {num:'KE 011',dep:'ICN',arr:'LAX',depT:'11:30',arrT:'06:45'},
+    {num:'KE 017',dep:'ICN',arr:'LAX',depT:'17:30',arrT:'12:45'},
+  ],
+  'KE_LAX_ICN':[
+    {num:'KE 012',dep:'LAX',arr:'ICN',depT:'11:00',arrT:'16:15+1'},
+    {num:'KE 018',dep:'LAX',arr:'ICN',depT:'23:55',arrT:'05:10+2'},
+  ],
+  'MH_ICN_KUL':[
+    {num:'MH 067',dep:'ICN',arr:'KUL',depT:'22:15',arrT:'04:50+1'},
+  ],
+  'MH_KUL_ICN':[
+    {num:'MH 068',dep:'KUL',arr:'ICN',depT:'08:05',arrT:'16:05'},
+  ],
+  'KE_ICN_SUB':[
+    {num:'KE 647',dep:'ICN',arr:'SUB',depT:'08:50',arrT:'14:25'},
+  ],
+  'KE_SUB_ICN':[
+    {num:'KE 648',dep:'SUB',arr:'ICN',depT:'15:30',arrT:'22:55'},
+  ],
+  'GA_ICN_SUB':[
+    {num:'GA 874',dep:'ICN',arr:'SUB',depT:'20:35',arrT:'02:05+1'},
+  ],
+  'GA_SUB_ICN':[
+    {num:'GA 875',dep:'SUB',arr:'ICN',depT:'03:05',arrT:'11:15'},
+  ],
+  'KE_ICN_CNX':[
+    {num:'KE 657',dep:'ICN',arr:'CNX',depT:'10:25',arrT:'13:50'},
+  ],
+  'KE_CNX_ICN':[
+    {num:'KE 658',dep:'CNX',arr:'ICN',depT:'15:05',arrT:'22:25'},
+  ],
+  'KE_ICN_BKI':[
+    {num:'KE 673',dep:'ICN',arr:'BKI',depT:'08:00',arrT:'13:30'},
+  ],
+  'KE_BKI_ICN':[
+    {num:'KE 674',dep:'BKI',arr:'ICN',depT:'14:35',arrT:'21:55'},
+  ],
+};
+
+function getMockKey(airline, dep, arr) {
+  return `${airline}_${dep}_${arr}`;
+}
+
+// 국적기(대한항공/아시아나 + 목적지 국가의 플래그 캐리어)만 노출 — 저가/외항사 등은 조회에서 제외
+const NATIONAL_CARRIERS = new Set(['KE','OZ','GA','SQ','MH','VN','TG','PR','NH','JL','CA','MU','CZ']);
+function filterNationalCarriers(schedules){
+  return schedules.filter(s=>NATIONAL_CARRIERS.has(s.airline));
+}
+
+// ============================================================
+// 실시간 항공편 스케줄 조회 (AirLabs) + 캐시 + MOCK 폴백
+// ============================================================
+const FLIGHT_API_KEY_STORAGE = 'ts_airlabs_api_key';
+const DEFAULT_FLIGHT_API_KEY = ''; // AirLabs api_key 기본값 — 없으면 사용자가 ⚙ 항공편 API 설정에서 직접 입력
+
+// 공유 캐시 프록시(flight-cache-proxy) — Upstash 토큰은 서버에만 있고, 클라이언트는 이 프록시 URL만 안다
+const CACHE_PROXY_URL_STORAGE = 'ts_cache_proxy_url';
+const ROUTE_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60; // 1주일 — 노선/편명 정보는 자주 바뀌지 않으므로 1주일간 공유 캐시를 재사용
+
+const ROUTE_CACHE = {}; // { "ICN_CGK": {schedules:[...], source:'live'|'mock'} } — 세션 내 인메모리 캐시(같은 페이지 안에서 중복 조회 방지). 실제 저장소는 공유 캐시 프록시.
+
+function getCacheProxyUrl(){ return (localStorage.getItem(CACHE_PROXY_URL_STORAGE) || '').trim().replace(/\/$/,''); }
+function setCacheProxyUrl(u){
+  if(u) localStorage.setItem(CACHE_PROXY_URL_STORAGE, u.trim().replace(/\/$/,''));
+  else localStorage.removeItem(CACHE_PROXY_URL_STORAGE);
+}
+
+// 프록시가 설정되어 있지 않으면 공유 캐시 없이(세션 캐시만으로) 동작
+async function sharedCacheGet(key){
+  const base = getCacheProxyUrl();
+  if(!base) return null;
+  try{
+    const res = await fetch(`${base}/flight-cache/${encodeURIComponent(key)}`);
+    const json = await res.json();
+    return (json && json.result != null) ? json.result : null;
+  }catch(e){
+    console.warn('공유 캐시 조회 실패:', e);
+    return null;
+  }
+}
+function sharedCacheSet(key, value, exSeconds){
+  const base = getCacheProxyUrl();
+  if(!base) return;
+  fetch(`${base}/flight-cache/${encodeURIComponent(key)}`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({value, ex: exSeconds})
+  }).catch(e=>console.warn('공유 캐시 저장 실패:', e));
+}
+
+function getFlightApiKey(){ return (localStorage.getItem(FLIGHT_API_KEY_STORAGE) || DEFAULT_FLIGHT_API_KEY).trim(); }
+function setFlightApiKey(k){
+  if(k) localStorage.setItem(FLIGHT_API_KEY_STORAGE, k);
+  else localStorage.removeItem(FLIGHT_API_KEY_STORAGE);
+}
+
+function routeCacheKey(dep, arr){ return `${dep}_${arr}`; }
+function routeSource(dep, arr){ return ROUTE_CACHE[routeCacheKey(dep, arr)]?.source; }
+
+// 해당 노선(출발→목적지)의 모든 항공사 스케줄 반환 (예시 데이터)
+function getMockSchedulesFor(dep, arr){
+  const out=[];
+  Object.keys(MOCK_SCHEDULES).forEach(key=>{
+    const [al,d,a]=key.split('_');
+    if(d===dep && a===arr){
+      MOCK_SCHEDULES[key].forEach(s=>out.push({...s, airline:al}));
+    }
+  });
+  return out;
+}
+
+// AirLabs /routes 를 호출해 노선의 실제 편명·시간을 가져온다 (실패 시 null)
+async function fetchLiveSchedules(dep, arr){
+  const key = getFlightApiKey();
+  if(!key) return null;
+  const params = `api_key=${encodeURIComponent(key)}&dep_iata=${dep}&arr_iata=${arr}&limit=100`;
+  const url = `https://airlabs.co/api/v9/routes?${params}`;
+  try{
+    const res = await fetch(url);
+    const json = await res.json();
+    if(json.error){
+      console.warn('AirLabs error:', json.error);
+      return null;
+    }
+    if(!Array.isArray(json.response)) return null;
+    const seen = new Set();
+    const out = [];
+    json.response.forEach(it=>{
+      const num = it.airline_iata && it.flight_number ? `${it.airline_iata} ${it.flight_number}` : it.flight_iata;
+      const depT = it.dep_time ? it.dep_time.slice(0,5) : null;
+      const arrT = it.arr_time ? it.arr_time.slice(0,5) : null;
+      if(!num || !depT || !arrT || !it.airline_iata) return;
+      const dedupKey = num+depT;
+      if(seen.has(dedupKey)) return;
+      seen.add(dedupKey);
+      out.push({num, dep: (it.dep_iata||dep).toUpperCase(), arr: (it.arr_iata||arr).toUpperCase(), depT, arrT, airline: it.airline_iata});
+    });
+    return filterNationalCarriers(out);
+  }catch(e){
+    console.warn('항공편 API 조회 실패:', e);
+  }
+  return null;
+}
+
+// 세션 캐시 → 공유 캐시 프록시(여러 기기 공통) → 실시간 조회 → 실패 시 예시 데이터 순으로 확인
+async function loadRouteSchedules(dep, arr){
+  const key = routeCacheKey(dep, arr);
+
+  const cached = ROUTE_CACHE[key];
+  if(cached) return cached.schedules;
+
+  const remoteRaw = await sharedCacheGet(`flight:${key}`);
+  if(remoteRaw){
+    try{
+      const remote = JSON.parse(remoteRaw);
+      ROUTE_CACHE[key] = remote;
+      return remote.schedules;
+    }catch(e){ /* 손상된 캐시면 무시하고 새로 조회 */ }
+  }
+
+  let schedules = await fetchLiveSchedules(dep, arr);
+  let source = 'live';
+  if(!schedules || !schedules.length){
+    schedules = getMockSchedulesFor(dep, arr);
+    source = 'mock';
+  }
+  const entry = {schedules, source};
+  ROUTE_CACHE[key] = entry;
+  sharedCacheSet(`flight:${key}`, JSON.stringify(entry), ROUTE_CACHE_TTL_SECONDS);
+  return schedules;
+}
+
+function openApiSettings(){
+  document.getElementById('api-key-input').value = getFlightApiKey();
+  document.getElementById('cache-proxy-input').value = getCacheProxyUrl();
+  updateApiKeyStatus();
+  openModal('modal-api');
+}
+function updateApiKeyStatus(){
+  const has = !!getFlightApiKey();
+  document.getElementById('api-key-status').textContent = has
+    ? '✓ API 키가 설정되어 있습니다 — 항공편 조회 시 실시간 데이터를 우선 시도합니다.'
+    : '키가 설정되어 있지 않습니다 — 예시 스케줄 데이터로 동작합니다.';
+  const hasProxy = !!getCacheProxyUrl();
+  document.getElementById('cache-proxy-status').textContent = hasProxy
+    ? '✓ 공유 캐시 프록시가 설정되어 있습니다 — 다른 기기와 조회 결과를 함께 씁니다.'
+    : '설정되어 있지 않습니다 — 이 기기 안에서만 캐시됩니다 (flight-cache-proxy 배포 후 URL을 입력하세요).';
+}
+function saveApiSettings(){
+  const v = document.getElementById('api-key-input').value.trim();
+  const proxyUrl = document.getElementById('cache-proxy-input').value.trim();
+  setFlightApiKey(v);
+  setCacheProxyUrl(proxyUrl);
+  Object.keys(ROUTE_CACHE).forEach(k=>delete ROUTE_CACHE[k]);
+  updateApiKeyStatus();
+  closeModal('modal-api');
+  showNotif('설정이 저장되었습니다');
+  if(document.getElementById('tab-flight').classList.contains('active')) renderFlights();
+}
+function clearApiSettings(){
+  document.getElementById('api-key-input').value = '';
+  document.getElementById('cache-proxy-input').value = '';
+  setFlightApiKey('');
+  setCacheProxyUrl('');
+  Object.keys(ROUTE_CACHE).forEach(k=>delete ROUTE_CACHE[k]);
+  updateApiKeyStatus();
+  showNotif('설정이 모두 삭제되었습니다');
+}
+
+// ============================================================
+// STATE
+// ============================================================
+const S = {
+  name:'장승호', dept:'경영지원실 엔지니어링팀 책임',
+  country:'인도네시아', city:'자카르타',
+  purpose:'THEP mill plant 운영 현안 협의 및 설비 점검, ABM 프로젝트 협의',
+  startDate:null, endDate:null,
+  flights:[],      // {id, num, dep, arr, depT, arrT, airline, date, note}
+  transfers: [],   // 공항↔호텔 자동 배차 + 사용자가 직접 추가한 배차 항목
+  hotels: [],      // 출장지 호텔은 직접 입력
+  dayNotes: {},    // {iso날짜: [{id, time, text}]} — 일정표에서 직접 입력하는 날짜별 활동
+  dayOrder: {},    // {iso날짜: [key, ...]} — 시간이 없는 항목들의 수동 정렬 순서(드래그로 변경)
+};
+
+// temp state for modals
+let _mfPicked = null; // picked schedule item from modal
+
+// ============================================================
+// STATE PERSISTENCE — 입력한 일정을 localStorage에 자동 저장/복원 + JSON 파일로 백업
+// ============================================================
+const TRIP_STATE_KEY='ts_trip_state_v1';
+
+function serializeState(){
+  return {
+    ...S,
+    startDate: S.startDate ? toISO(S.startDate) : null,
+    endDate: S.endDate ? toISO(S.endDate) : null,
+  };
+}
+function applyStateObj(data){
+  Object.assign(S, data);
+  S.startDate = data.startDate ? mkDate(data.startDate) : null;
+  S.endDate = data.endDate ? mkDate(data.endDate) : null;
+  S.flights = data.flights || [];
+  S.transfers = data.transfers || [];
+  S.hotels = data.hotels || [];
+  S.dayNotes = data.dayNotes || {};
+  S.dayOrder = data.dayOrder || {};
+}
+function persistState(){
+  try{ localStorage.setItem(TRIP_STATE_KEY, JSON.stringify(serializeState())); }
+  catch(e){ console.warn('일정 저장 실패:', e); }
+}
+function loadPersistedState(){
+  try{
+    const raw=localStorage.getItem(TRIP_STATE_KEY);
+    if(!raw) return false;
+    applyStateObj(JSON.parse(raw));
+    return true;
+  }catch(e){ console.warn('저장된 일정을 불러오지 못했습니다:', e); return false; }
+}
+// 저장된 상태를 화면(폼/달력/목록)에 반영
+function hydrateFormFromState(){
+  document.getElementById('f-name').value=S.name||'';
+  document.getElementById('f-dept').value=S.dept||'';
+  if(S.country){ document.getElementById('f-country').value=S.country; onCountryChange(); }
+  if(S.city) document.getElementById('f-city').value=S.city;
+  document.getElementById('f-purpose').value=S.purpose||'';
+  if(S.startDate){
+    document.getElementById('ct-s').textContent=fmtLong(S.startDate);
+    CAL.view.s={y:S.startDate.getFullYear(),m:S.startDate.getMonth()};
+  }
+  if(S.endDate){
+    document.getElementById('ct-e').textContent=fmtLong(S.endDate);
+    CAL.view.e={y:S.endDate.getFullYear(),m:S.endDate.getMonth()};
+  }
+  renderCal('s');renderCal('e');
+  if(S.name && S.dept && S.startDate && S.endDate) markDone('setup');
+  renderFlights();renderTransfers();renderHotels();renderTimeline();
+  updateSummary();
+}
+function downloadStateJson(){
+  const blob=new Blob([JSON.stringify(serializeState(), null, 2)], {type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`${S.name||'출장'}_${S.city||''}_일정.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showNotif('JSON 파일로 저장되었습니다');
+}
+function uploadStateJson(file){
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      applyStateObj(JSON.parse(e.target.result));
+      persistState();
+      hydrateFormFromState();
+      showNotif('JSON 파일에서 일정을 불러왔습니다');
+    }catch(err){
+      showNotif('JSON 파일을 읽을 수 없습니다');
+    }
+  };
+  reader.readAsText(file);
+  document.getElementById('json-file-input').value='';
+}
+function startNewTrip(){
+  if(!confirm('현재 일정을 지우고 새 일정을 시작할까요? 저장되지 않은 내용은 사라집니다.')) return;
+  localStorage.removeItem(TRIP_STATE_KEY);
+  location.reload();
+}
+
+// ============================================================
+// UTILS
+// ============================================================
+function uid(){return 'id'+Math.random().toString(36).slice(2,8)}
+function pad(n){return String(n).padStart(2,'0')}
+function mkDate(s){if(!s)return null;const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)}
+function toISO(d){if(!d)return'';return`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}
+function fmtLong(d){if(!d)return'날짜 선택';return`${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())} (${DOWS[d.getDay()]})`}
+function fmtShort(d){if(!d)return'-';return`${d.getMonth()+1}/${d.getDate()}(${DOWS[d.getDay()]})`}
+function hasPgk(){return S.flights.some(f=>f.dep==='PGK'||f.arr==='PGK')}
+function showNotif(m){const n=document.getElementById('notif');n.textContent='✓ '+m;n.style.display='block';setTimeout(()=>n.style.display='none',2500)}
+function airlinesClassOf(code){return code==='KE'||code==='OZ'?'al-ke':code==='GA'?'al-ga':'al-xx'}
+
+// ============================================================
+// CALENDAR
+// ============================================================
+const CAL={open:{s:false,e:false},view:{s:{y:2026,m:3},e:{y:2026,m:3}}};
+function toggleCal(w,ev){if(ev)ev.stopPropagation();const o=w==='s'?'e':'s';closeCal(o);CAL.open[w]=!CAL.open[w];document.getElementById('cal-'+w).classList.toggle('open',CAL.open[w]);document.getElementById('cb-'+w).classList.toggle('open',CAL.open[w]);if(CAL.open[w])renderCal(w)}
+function closeCal(w){CAL.open[w]=false;document.getElementById('cal-'+w).classList.remove('open');document.getElementById('cb-'+w).classList.remove('open')}
+function calNav(w,d,ev){if(ev)ev.stopPropagation();CAL.view[w].m+=d;if(CAL.view[w].m<0){CAL.view[w].m=11;CAL.view[w].y--}if(CAL.view[w].m>11){CAL.view[w].m=0;CAL.view[w].y++}renderCal(w)}
+function renderCal(w){
+  const{y,m}=CAL.view[w];const fd=new Date(y,m,1).getDay();const dm=new Date(y,m+1,0).getDate();
+  const today=new Date();today.setHours(0,0,0,0);
+  let h=`<div class="cal-nav"><button class="cal-navbtn" onclick="calNav('${w}',-1,event)">‹</button><span class="cal-ml">${y}년 ${MONTHS[m]}</span><button class="cal-navbtn" onclick="calNav('${w}',1,event)">›</button></div><div class="cal-grid">`;
+  DOWS.forEach(d=>{h+=`<div class="cal-dow">${d}</div>`});
+  for(let i=0;i<fd;i++)h+=`<div class="cal-d emp"></div>`;
+  for(let d=1;d<=dm;d++){
+    const cur=new Date(y,m,d);let cls='cal-d';const past=cur<today;
+    if(cur.getTime()===today.getTime())cls+=' today';
+    if(S.startDate&&cur.getTime()===S.startDate.getTime())cls+=' sel';
+    if(S.endDate&&cur.getTime()===S.endDate.getTime())cls+=' sel';
+    if(S.startDate&&S.endDate&&cur>S.startDate&&cur<S.endDate)cls+=' inr';
+    if(past)cls+=' dis';
+    h+=`<div class="${cls}"${past?'':` onclick="pickDay('${w}',${y},${m},${d})"`}>${d}</div>`;
+  }
+  h+='</div>';
+  document.getElementById('cal-'+w).innerHTML=h;
+}
+function pickDay(w,y,m,d){
+  const p=new Date(y,m,d);
+  if(w==='s')S.startDate=p;else S.endDate=p;
+  document.getElementById('ct-'+w).textContent=fmtLong(p);
+  closeCal(w);renderCal('s');renderCal('e');updateSummary();
+}
+document.addEventListener('click',e=>{['s','e'].forEach(w=>{const wr=document.getElementById('cw-'+w);if(wr&&!wr.contains(e.target))closeCal(w)})});
+
+// ============================================================
+// COUNTRY / CITY
+// ============================================================
+const CITY_DATA={};
+Object.entries(COUNTRY_DATA).forEach(([country,d])=>{
+  CITY_DATA[country]=d.cities.map(c=>{const[label,name,iata,hub]=c.split('|');return{label,name,iata,hub}});
+});
+// IATA → 한글 도시명 (엑셀 출력의 "인천 (ICN) → 자카르타 (CGK)" 표기용)
+const IATA_TO_NAME={ICN:'인천'};
+Object.values(CITY_DATA).forEach(cities=>cities.forEach(c=>{IATA_TO_NAME[c.iata]=c.name}));
+function onCountryChange(){
+  const country=document.getElementById('f-country').value;
+  const cityEl=document.getElementById('f-city');
+  const cities=CITY_DATA[country]||[];
+  cityEl.innerHTML=cities.map(c=>`<option value="${c.name}">${c.label}</option>`).join('');
+  updateSummary();
+}
+
+// ============================================================
+// TABS / STEP
+// ============================================================
+function goTab(name){
+  document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.querySelector(`[data-tab="${name}"]`).classList.add('active');
+  document.getElementById('step-'+name).classList.add('active');
+  if(name==='flight')renderFlights();
+  if(name==='transfer')renderTransfers();
+  if(name==='hotel')renderHotels();
+  if(name==='timeline')renderTimeline();
+  if(name==='export')renderExport();
+}
+function markDone(s){document.getElementById('step-'+s).classList.add('done');document.getElementById('sn-'+s).textContent='✓'}
+function unmarkDone(s){document.getElementById('step-'+s).classList.remove('done');document.getElementById('sn-'+s).textContent=({setup:1,flight:2,transfer:3,hotel:4,timeline:5,export:6})[s]}
+
+// ============================================================
+// SETUP
+// ============================================================
+async function saveSetup(){
+  const name=document.getElementById('f-name').value.trim();
+  const dept=document.getElementById('f-dept').value.trim();
+  if(!name||!dept){ showNotif('출장자 이름과 소속을 입력하세요'); return; }
+  if(!S.startDate||!S.endDate){ showNotif('출발일과 귀국일을 선택하세요'); return; }
+  S.name=name;
+  S.dept=dept;
+  S.country=document.getElementById('f-country').value;
+  S.city=document.getElementById('f-city').value;
+  S.purpose=document.getElementById('f-purpose').value;
+  markDone('setup');updateSummary();
+  // 기본 스케줄 자동 로드 (실시간 API 조회 시도, 실패 시 예시 데이터로 폴백)
+  showNotif('항공편 스케줄 조회 중...');
+  await autoLoadDefaultFlights();
+  showNotif('기본 정보 저장 완료');
+  goTab('flight');
+}
+
+// ── 차량 배차 자동 산정용 시간 계산 유틸 ──
+function parseHM(t){
+  const clean=(t||'').replace('+1','');
+  const [h,m]=clean.split(':').map(Number);
+  return h*60+m;
+}
+function minutesToHM(mins){
+  const m=((mins%1440)+1440)%1440;
+  return `${pad(Math.floor(m/60))}:${pad(m%60)}`;
+}
+function addDaysISO(iso, days){
+  if(!iso || !days) return iso;
+  const d=mkDate(iso); d.setDate(d.getDate()+days);
+  return toISO(d);
+}
+// 공항 도착 후 호텔행 차량 출발시각 = 도착시각 + 30분이 지난 다음 정각
+function computeArrivalPickup(leg){
+  const dayOffset=(leg.arrT||'').includes('+1')?1:0;
+  const mins=parseHM(leg.arrT)+30;
+  const rounded=Math.ceil(mins/60)*60;
+  const extraDays=Math.floor(rounded/1440);
+  return {date:addDaysISO(leg.date, dayOffset+extraDays), time:minutesToHM(rounded)};
+}
+// 귀국편 탑승을 위한 호텔→공항 출발시각 = 항공편 출발 3시간 전 (공항엔 2시간 전 도착)
+function computeDeparturePickup(leg){
+  const mins=parseHM(leg.depT)-180;
+  const dayShift=Math.floor(mins/1440);
+  return {date:addDaysISO(leg.date, dayShift), time:minutesToHM(mins)};
+}
+
+// 목적지에 실제로 도착/출발하는 항공편을 기준으로 공항↔호텔 차량 배차를 자동 산정한다
+// (사용자가 직접 추가한 배차 항목은 건드리지 않고, 이전에 자동 생성된 항목만 새로 계산해 교체)
+function autoLoadDefaultTransfers(){
+  const cityObj = CITY_DATA[S.country]?.find(c => c.name === S.city);
+  const destIata = cityObj ? cityObj.iata : null;
+  if(!destIata) return;
+
+  S.transfers = S.transfers.filter(t=>!t.auto);
+
+  const arrivalLeg = S.flights.find(f=>f.arr===destIata);
+  const departureLeg = [...S.flights].reverse().find(f=>f.dep===destIata);
+
+  if(arrivalLeg){
+    const {date,time} = computeArrivalPickup(arrivalLeg);
+    S.transfers.unshift({
+      id:uid(), auto:'arrival',
+      label:`공항 → 호텔 (${S.city} 도착)`,
+      sub:`${arrivalLeg.dep}→${arrivalLeg.arr} 도착 후 호텔 이동`,
+      on:true, date, time
+    });
+  }
+  if(departureLeg){
+    const {date,time} = computeDeparturePickup(departureLeg);
+    S.transfers.push({
+      id:uid(), auto:'departure',
+      label:'호텔 → 공항 (귀국)',
+      sub:`${departureLeg.num} 탑승 3시간 전 출발`,
+      on:true, date, time
+    });
+  }
+}
+
+// 각 단계의 "저장 후 다음" — 검증 실패 시 다음 단계로 넘어가지 않고, 좌측 체크 표시도 되지 않는다
+function saveFlightStep(){
+  if(!S.flights.length){ showNotif('항공편을 최소 1개 이상 추가하세요'); unmarkDone('flight'); return; }
+  markDone('flight');
+  goTab('transfer');
+}
+function saveTransferStep(){
+  if(!S.transfers.some(t=>t.on)){ showNotif('최소 1개 이상의 배차 구간을 활성화하세요'); unmarkDone('transfer'); return; }
+  markDone('transfer');
+  goTab('hotel');
+}
+function saveHotelStep(){
+  if(!S.hotels.length){ showNotif('호텔을 최소 1개 이상 추가하세요'); unmarkDone('hotel'); return; }
+  const incomplete=S.hotels.find(h=>!h.name||!h.cin||!h.cout);
+  if(incomplete){ showNotif(`"${incomplete.name||'이름 미입력'}" 호텔의 체크인/체크아웃 날짜를 입력하세요`); unmarkDone('hotel'); return; }
+  markDone('hotel');
+  goTab('timeline');
+}
+function saveTimelineStep(){
+  if(!S.startDate||!S.endDate){ showNotif('출발일·귀국일을 먼저 설정하세요'); unmarkDone('timeline'); return; }
+  markDone('timeline');
+  goTab('export');
+}
+
+function updateSummary(){
+  document.getElementById('sum-s').textContent=fmtShort(S.startDate);
+  document.getElementById('sum-e').textContent=fmtShort(S.endDate);
+  const c=document.getElementById('f-country')?.value||S.country;
+  const ci=document.getElementById('f-city')?.value||S.city;
+  document.getElementById('sum-d').textContent=`${c} · ${ci}`;
+  if(S.startDate&&S.endDate){
+    const n=Math.round((S.endDate-S.startDate)/86400000);
+    document.getElementById('hdr-dates').textContent=toISO(S.startDate)+' ~ '+toISO(S.endDate);
+    document.getElementById('hdr-badge').textContent=`${n}박${n+1}일`;
+    document.getElementById('hdr-badge').style.display='';
+  }
+  document.getElementById('sum-f').textContent=S.flights.length+'편';
+  document.getElementById('sum-c').textContent=S.transfers.filter(t=>t.on).length+'건';
+  document.getElementById('sum-h').textContent=S.hotels.length+'건';
+  persistState();
+}
+
+// 항공편 목록을 날짜 → 출발시간 순으로 정렬
+function sortFlightsByDeparture(){
+  S.flights.sort((a,b)=> (a.date||'').localeCompare(b.date||'') || (a.depT||'').localeCompare(b.depT||''));
+}
+
+// ============================================================
+// AUTO LOAD DEFAULT FLIGHTS — 도시 IATA 기반 왕복 자동 결정
+// ============================================================
+async function autoLoadDefaultFlights(){
+  const country = S.country;
+  const cData   = COUNTRY_DATA[country];
+  if(!cData) return;
+
+  // 선택된 도시의 IATA 코드 찾기
+  const cityObj = CITY_DATA[country]?.find(c => c.name === S.city);
+  const destIata = cityObj ? cityObj.iata : null;
+  if(!destIata){ showNotif('선택한 도시의 공항 코드를 찾을 수 없습니다'); return; }
+
+  S.flights = [];
+
+  // 항공사 우선순위: 국가 mainAirline → KE → GA → ...
+  const airlines = [cData.mainAirline, 'KE', 'GA', 'SQ', 'TG', 'NH', 'MH'];
+  const outDate = S.startDate ? toISO(S.startDate) : '';
+  const inDate  = S.endDate ? toISO(S.endDate) : '';
+
+  // 연결편 선택 시, 이전 구간 도착시각(minDepT) 이후 출발하는 편을 우선 선택 (환승 가능한 편)
+  function pickFeasible(list, minDepT){
+    if(!minDepT) return list[0];
+    const min = minDepT.replace('+1','');
+    return list.find(f => f.depT >= min) || list[0];
+  }
+
+  async function addLeg(dep, arr, date, minDepT){
+    if(dep === arr) return null;
+    const schedules = await loadRouteSchedules(dep, arr);
+    if(!schedules || !schedules.length) return null;
+    let chosen = null;
+    for(const al of airlines){
+      const list = schedules.filter(s => s.airline === al);
+      if(list.length){ chosen = pickFeasible(list, minDepT); break; }
+    }
+    if(!chosen) chosen = pickFeasible(schedules, minDepT);
+    const obj = {id: uid(), num: chosen.num, dep, arr, depT: chosen.depT, arrT: chosen.arrT, airline: chosen.airline, date, note: ''};
+    S.flights.push(obj);
+    return obj;
+  }
+
+  if(cityObj && cityObj.hub){
+    // 국제선 미취항 도시 — 허브(예: 방카→자카르타) 경유로 왕복 구성, 환승 가능한 시간대로 연결
+    const hub = cityObj.hub;
+    const leg1 = await addLeg('ICN', hub, outDate);
+    await addLeg(hub, destIata, outDate, leg1?.arrT);
+    const leg3 = await addLeg(destIata, hub, inDate);
+    await addLeg(hub, 'ICN', inDate, leg3?.arrT);
+  } else {
+    const gmpDest = destIata === 'ICN' ? 'GMP' : 'ICN';
+    await addLeg(gmpDest, destIata, outDate);
+    await addLeg(destIata, gmpDest, inDate);
+  }
+
+  if(S.flights.length === 0){
+    showNotif('선택한 노선의 스케줄을 찾을 수 없습니다. 항공편을 직접 추가해 주세요.');
+  }
+
+  sortFlightsByDeparture();
+  autoLoadDefaultTransfers();
+}
+
+// ============================================================
+// FLIGHTS RENDER — 인라인 편수 선택 패널 포함
+// ============================================================
+
+// 어떤 flight 카드가 expanded인지 추적
+const _fiExpanded = new Set();
+
+function renderFlights(){
+  const pgk=hasPgk();
+  const banner=document.getElementById('flight-banner');
+  const pgkBanner=pgk
+    ?`<div class="banner banner-green">🟢 방카(PGK) 경유 항공편 포함 — GA 편이 선택됨</div>`
+    :`<div class="banner banner-blue">✈ ${S.country} · ${S.city} 노선 — 편명 클릭 시 시간대별 편수를 선택할 수 있습니다</div>`;
+  const sources=S.flights.map(f=>routeSource(f.dep,f.arr)).filter(Boolean);
+  let sourceBanner='';
+  if(sources.length && sources.every(s=>s==='live')){
+    sourceBanner=`<div class="banner banner-blue">📡 실시간 항공편 API로 조회된 스케줄입니다</div>`;
+  }else if(sources.some(s=>s==='mock')){
+    sourceBanner=getFlightApiKey()
+      ?`<div class="banner banner-blue">⚠ 일부 노선은 실시간 조회에 실패해 예시 데이터를 표시합니다</div>`
+      :`<div class="banner banner-blue">ℹ 예시 스케줄 데이터 사용 중 — 우측 상단 ⚙ 항공편 API 설정에서 실시간 연동 키를 등록할 수 있습니다</div>`;
+  }
+  banner.innerHTML=pgkBanner+sourceBanner;
+
+  const list=document.getElementById('flight-list');
+  if(!S.flights.length){
+    list.innerHTML=`<div style="color:var(--text3);font-size:13px;padding:16px 0;">항공편이 없습니다. 아래 버튼으로 추가하세요.</div>`;
+    return;
+  }
+
+  list.innerHTML=S.flights.map(f=>{
+    const ac=airlinesClassOf(f.airline);
+    const expanded=_fiExpanded.has(f.id);
+    // 이 노선(출발-목적지)의 모든 항공사 스케줄 찾기
+    const schedules = getSchedulesFor(f.dep, f.arr);
+    const hasMulti = schedules.length > 1;
+
+    // 스케줄 행 HTML
+    const schedHtml = schedules.length === 0
+      ? `<div class="fi-no-sched">스케줄 데이터가 없습니다. 편명을 직접 수정하세요.</div>`
+      : schedules.map((s,i)=>{
+          const isCur = s.num === f.num;
+          return `<div class="fi-sched-row ${isCur?'active':''}" onclick="pickFlightSched('${f.id}',${i})">
+            <div class="fi-sched-check">✓</div>
+            <span class="al ${airlinesClassOf(s.airline)}">${s.airline}</span>
+            <span class="fi-sched-num">${s.num}</span>
+            <span class="fi-sched-time">${s.depT} – ${s.arrT}</span>
+            <span class="fi-sched-note">${f.dep} → ${f.arr}</span>
+          </div>`;
+        }).join('');
+
+    return `<div class="fi-wrap" id="fiw-${f.id}">
+      <div class="fi-card ${expanded?'expanded':''}">
+        <div class="fi-row" onclick="${hasMulti||schedules.length?`toggleFiExpand('${f.id}')`:'void(0)'}">
+          <span class="al ${ac}">${f.airline||'??'}</span>
+          <div class="fi-num">${f.num}</div>
+          <div class="fi-route" style="display:flex;align-items:center;gap:4px;font-size:13px;font-weight:600;min-width:90px">${f.dep}<span style="color:var(--text3);font-size:10px;margin:0 2px">→</span>${f.arr}</div>
+          <div class="fi-time" style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2);min-width:110px">${f.depT} – ${f.arrT}</div>
+          <div style="flex:1;font-size:11px;color:var(--text3)">${f.date||'날짜 미지정'}${f.arrDate&&f.arrDate!==f.date?' → '+f.arrDate:''}${f.note?' · '+f.note:''}</div>
+          ${schedules.length>0?`<span class="fi-expand-icon">${expanded?'▲':'▼'}</span>`:''}
+          <button class="fi-del" onclick="event.stopPropagation();deleteFlight('${f.id}')" title="삭제">✕</button>
+        </div>
+        ${schedules.length>0?`
+        <div class="fi-picker">
+          <div class="fi-picker-label">
+            🕐 시간대별 편수 선택
+            <span style="font-weight:400;color:var(--text3)">(${schedules.length}편 운항)</span>
+          </div>
+          <div class="fi-sched-grid" id="fsg-${f.id}">${schedHtml}</div>
+        </div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  updateSummary();
+
+  // 아직 캐시되지 않은 노선은 백그라운드에서 실시간 스케줄을 조회하고, 도착하면 화면을 갱신한다
+  const pending=new Set();
+  S.flights.forEach(f=>{
+    const key=routeCacheKey(f.dep,f.arr);
+    if(!ROUTE_CACHE[key] && !pending.has(key)){
+      pending.add(key);
+      loadRouteSchedules(f.dep,f.arr).then(()=>{
+        if(document.getElementById('tab-flight').classList.contains('active')) renderFlights();
+      });
+    }
+  });
+}
+
+function toggleFiExpand(id){
+  if(_fiExpanded.has(id)) _fiExpanded.delete(id);
+  else _fiExpanded.add(id);
+  // 해당 카드만 토글 (전체 재렌더 없이)
+  const card=document.querySelector(`#fiw-${id} .fi-card`);
+  const icon=document.querySelector(`#fiw-${id} .fi-expand-icon`);
+  if(card){
+    card.classList.toggle('expanded',_fiExpanded.has(id));
+    if(icon)icon.textContent=_fiExpanded.has(id)?'▲':'▼';
+  }
+}
+
+function pickFlightSched(fid, schedIdx){
+  const f=S.flights.find(x=>x.id===fid);
+  if(!f) return;
+  const schedules=getSchedulesFor(f.dep, f.arr);
+  const s=schedules[schedIdx];
+  if(!s) return;
+  f.num=s.num; f.depT=s.depT; f.arrT=s.arrT; f.airline=s.airline;
+  // 시간이 바뀌면 출발시간 기준 순서도 바뀔 수 있으므로 정렬 후 전체 재렌더
+  sortFlightsByDeparture();
+  renderFlights();
+  autoLoadDefaultTransfers();
+  if(document.getElementById('tab-transfer').classList.contains('active'))renderTransfers();
+  showNotif(`${s.airline} ${s.num} (${s.depT}–${s.arrT}) 선택됨`);
+}
+
+// 해당 노선(출발→목적지)의 스케줄 반환 — 실시간 캐시가 있으면 그것을, 없으면 예시 데이터를 즉시 반환
+function getSchedulesFor(dep, arr){
+  const cached = ROUTE_CACHE[routeCacheKey(dep, arr)];
+  const schedules = cached ? cached.schedules : getMockSchedulesFor(dep, arr);
+  return filterNationalCarriers(schedules).sort((a,b)=>(a.depT||'').localeCompare(b.depT||''));
+}
+
+function deleteFlight(id){
+  _fiExpanded.delete(id);
+  S.flights=S.flights.filter(f=>f.id!==id);
+  autoLoadDefaultTransfers();
+  renderFlights();
+  if(document.getElementById('tab-transfer').classList.contains('active'))renderTransfers();
+  if(document.getElementById('tab-hotel').classList.contains('active'))renderHotels();
+}
+
+// ============================================================
+// MODAL: ADD FLIGHT
+// ============================================================
+function openAddFlight(){
+  _mfPicked=null;
+  document.getElementById('mf-airline').value='';
+  document.getElementById('mf-dep').value='ICN';
+  document.getElementById('mf-arr').value='';
+  document.getElementById('mf-date').value=S.startDate?toISO(S.startDate):'';
+  document.getElementById('mf-arr-date').value=S.startDate?toISO(S.startDate):'';
+  document.getElementById('mf-results').style.display='none';
+  document.getElementById('mf-manual').style.display='none';
+  document.getElementById('mf-confirm').disabled=true;
+  // 국가 기반 기본값
+  const d=COUNTRY_DATA[S.country];
+  if(d){
+    document.getElementById('mf-airline').value=d.mainAirline;
+    onMfAirlineChange();
+  }
+  openModal('modal-flight');
+}
+function swapMfRoute(){
+  const depEl=document.getElementById('mf-dep');
+  const arrEl=document.getElementById('mf-arr');
+  const tmp=depEl.value;
+  depEl.value=arrEl.value;
+  arrEl.value=tmp;
+}
+function onMfAirlineChange(){
+  const al=document.getElementById('mf-airline').value;
+  document.getElementById('mf-manual').style.display=al==='XX'?'block':'none';
+  document.getElementById('mf-results').style.display='none';
+  document.getElementById('mf-confirm').disabled=al!=='XX';
+  _mfPicked=null;
+  // 국가 기반 목적지 자동 채움
+  const d=COUNTRY_DATA[S.country];
+  if(d&&al!=='XX'){
+    // 출발지가 ICN이면 arr을 목적지로
+    const city=CITY_DATA[S.country]?.find(c=>c.name===S.city);
+    if(city)document.getElementById('mf-arr').value=city.iata;
+  }
+}
+async function searchSchedule(){
+  const dep=document.getElementById('mf-dep').value.trim().toUpperCase();
+  const arr=document.getElementById('mf-arr').value.trim().toUpperCase();
+  if(!dep||!arr){showNotif('출발지, 목적지를 입력하세요');return}
+  const listEl=document.getElementById('mf-sched-list');
+  const resultsEl=document.getElementById('mf-results');
+  resultsEl.style.display='block';
+  listEl.innerHTML=`<div class="sched-item loading"><div class="spin"></div> 스케줄 조회 중...</div>`;
+  const results=await loadRouteSchedules(dep,arr);
+  const source=routeSource(dep,arr);
+  document.getElementById('mf-result-count').textContent=`(${results.length}편${source==='live'?' · 📡 실시간':' · 예시 데이터'})`;
+  if(!results.length){
+    listEl.innerHTML=`<div class="sched-item loading">해당 노선 스케줄이 없습니다. 직접 입력을 이용하세요.</div>`;
+    return;
+  }
+  listEl.innerHTML=results.map((r,i)=>`
+    <div class="sched-item" onclick="pickSchedule(${i})" id="si-${i}">
+      <div class="sched-check">✓</div>
+      <span class="al ${airlinesClassOf(r.airline)}">${r.airline}</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;min-width:56px">${r.num}</span>
+      <span style="font-size:12px;color:var(--text2);flex:1">${dep} → ${arr}</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2)">${r.depT} – ${r.arrT}</span>
+    </div>`).join('');
+  // store for picking
+  listEl._data={results,dep,arr};
+}
+
+function pickSchedule(i){
+  document.querySelectorAll('.sched-item').forEach(e=>e.classList.remove('picked'));
+  document.getElementById('si-'+i).classList.add('picked');
+  const listEl=document.getElementById('mf-sched-list');
+  const data=listEl._data;
+  const r=data?.results[i];
+  if(r){_mfPicked={num:r.num,depT:r.depT,arrT:r.arrT,airline:r.airline,dep:data.dep,arr:data.arr};document.getElementById('mf-confirm').disabled=false}
+}
+
+function confirmAddFlight(){
+  const al=document.getElementById('mf-airline').value;
+  const date=document.getElementById('mf-date').value;
+  const arrDate=document.getElementById('mf-arr-date').value;
+  if(al==='XX'){
+    // manual
+    const num=document.getElementById('mf-num').value.trim();
+    const dep=document.getElementById('mf-dep').value.trim().toUpperCase();
+    const arr=document.getElementById('mf-arr').value.trim().toUpperCase();
+    const depT=document.getElementById('mf-dep-t').value;
+    const arrT=document.getElementById('mf-arr-t').value;
+    const note=document.getElementById('mf-note').value.trim();
+    if(!num||!dep||!arr){showNotif('편명, 출발지, 목적지를 입력하세요');return}
+    S.flights.push({id:uid(),num,dep,arr,depT,arrT,airline:'XX',date,arrDate,note});
+  } else {
+    if(!_mfPicked){showNotif('스케줄을 검색하여 편을 선택하세요');return}
+    S.flights.push({id:uid(),..._mfPicked,date,arrDate,note:''});
+  }
+  closeModal('modal-flight');
+  sortFlightsByDeparture();
+  autoLoadDefaultTransfers();
+  renderFlights();
+  if(document.getElementById('tab-transfer').classList.contains('active'))renderTransfers();
+  if(document.getElementById('tab-hotel').classList.contains('active'))renderHotels();
+  showNotif('항공편이 추가되었습니다');
+}
+
+// ============================================================
+// TRANSFERS
+// ============================================================
+function renderTransfers(){
+  const bannerEl=document.getElementById('transfer-banner');
+  bannerEl.innerHTML=`<div class="banner banner-blue">🚗 ${S.city} 출장 차량 배차 목록입니다 — 시간을 클릭해 직접 수정할 수 있습니다</div>`;
+
+  const el=document.getElementById('transfer-list');
+  if(!S.transfers.length){el.innerHTML=`<div style="color:var(--text3);font-size:13px;padding:12px 0;">배차 항목이 없습니다.</div>`;return}
+  el.innerHTML=S.transfers.map(t=>{
+    const i=S.transfers.indexOf(t);
+    const tp=from24Time(t.time);
+    return`<div class="tr-item" id="tritem-${t.id}">
+      <div class="tr-ico">🚗</div>
+      <div class="tr-info">
+        <div class="tr-title">${t.label}</div>
+        <div class="tr-sub">${t.sub}${t.date?' · '+t.date:''}</div>
+      </div>
+      <div class="tr-time-picker" data-tid="${t.id}" style="display:flex;gap:4px;flex:0 0 auto">
+        <select class="fselect tr-time-ampm" style="width:56px;padding:6px 4px;font-size:12px" onchange="onTransferTimeChange('${t.id}')">
+          <option value="AM" ${tp.ampm==='AM'?'selected':''}>오전</option>
+          <option value="PM" ${tp.ampm==='PM'?'selected':''}>오후</option>
+        </select>
+        <select class="fselect tr-time-h" style="width:46px;padding:6px 4px;font-size:12px" onchange="onTransferTimeChange('${t.id}')">
+          ${[1,2,3,4,5,6,7,8,9,10,11,12].map(x=>`<option value="${x}" ${x===tp.h?'selected':''}>${x}</option>`).join('')}
+        </select>
+        <select class="fselect tr-time-m" style="width:46px;padding:6px 4px;font-size:12px" onchange="onTransferTimeChange('${t.id}')">
+          ${[0,10,20,30,40,50].map(x=>`<option value="${x}" ${x===tp.m?'selected':''}>${String(x).padStart(2,'0')}</option>`).join('')}
+        </select>
+      </div>
+      <div class="tr-toggle ${t.on?'on':''}" onclick="toggleTransfer(${i})"></div>
+      <button class="tr-del" onclick="deleteTransfer('${t.id}')">✕</button>
+    </div>`;
+  }).join('');
+  updateSummary();
+}
+
+function toggleTransfer(i){S.transfers[i].on=!S.transfers[i].on;renderTransfers()}
+function deleteTransfer(id){S.transfers=S.transfers.filter(t=>t.id!==id);renderTransfers()}
+function updateTransferTime(id,val){
+  const t=S.transfers.find(x=>x.id===id);
+  if(t){ t.time=val; renderTimeline(); }
+}
+function onTransferTimeChange(id){
+  const wrap=document.querySelector(`.tr-time-picker[data-tid="${id}"]`);
+  if(!wrap) return;
+  const ampm=wrap.querySelector('.tr-time-ampm').value;
+  const h=wrap.querySelector('.tr-time-h').value;
+  const m=wrap.querySelector('.tr-time-m').value;
+  updateTransferTime(id, to24Time(ampm,h,m));
+}
+
+// 오전/오후 + 1~12시 + 10분 단위 시간 선택 <-> 24시간 "HH:MM" 변환
+function to24Time(ampm,h,m){
+  h=Number(h); m=Number(m);
+  let hh=h%12;
+  if(ampm==='PM') hh+=12;
+  return `${String(hh).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+function from24Time(val){
+  if(!val) return {ampm:'AM', h:9, m:0};
+  const [H,M]=val.split(':').map(Number);
+  const ampm = H<12 ? 'AM' : 'PM';
+  let h=H%12; if(h===0) h=12;
+  let m=Math.round(M/10)*10; if(m>=60) m=0;
+  return {ampm, h, m};
+}
+
+function openAddTransfer(){
+  document.getElementById('mt-from').value='';
+  document.getElementById('mt-to').value='';
+  document.getElementById('mt-sub').value='';
+  document.getElementById('mt-date').value='';
+  document.getElementById('mt-ampm').value='AM';
+  document.getElementById('mt-hour').value='9';
+  document.getElementById('mt-min').value='0';
+  openModal('modal-transfer');
+}
+function confirmAddTransfer(){
+  const from=document.getElementById('mt-from').value.trim();
+  const to=document.getElementById('mt-to').value.trim();
+  if(!from||!to){showNotif('출발지와 도착지를 입력하세요');return}
+  S.transfers.push({
+    id:uid(),
+    label:`${from} → ${to}`,
+    sub:document.getElementById('mt-sub').value.trim(),
+    date:document.getElementById('mt-date').value,
+    time:to24Time(document.getElementById('mt-ampm').value,document.getElementById('mt-hour').value,document.getElementById('mt-min').value),
+    on:true
+  });
+  closeModal('modal-transfer');renderTransfers();showNotif('차량 배차 항목이 추가되었습니다');
+}
+
+// ============================================================
+// HOTELS
+// ============================================================
+function renderHotels(){
+  const el=document.getElementById('hotel-list');
+  if(!S.hotels.length){el.innerHTML=`<div style="color:var(--text3);font-size:13px;padding:12px 0;">호텔이 없습니다. 아래 버튼으로 추가하세요.</div>`;return}
+  el.innerHTML=S.hotels.map((h,i)=>{
+    const hdrCls=h.open?'hotel-hdr active':'hotel-hdr';
+    const bodyCls=h.open?'hotel-body open':'hotel-body';
+    return`<div class="hotel-item" id="hitem-${h.id}">
+      <div class="${hdrCls}" onclick="toggleHotelOpen('${h.id}')">
+        <div class="hotel-check">✓</div>
+        <div style="flex:1">
+          <div class="hotel-name">${h.name}</div>
+          <div class="hotel-sub">${h.city}${h.cin?' · 체크인 '+h.cin:''} ${h.cout?'~ '+h.cout:''}</div>
+        </div>
+        <button class="hotel-del" onclick="event.stopPropagation();deleteHotel('${h.id}')">✕</button>
+      </div>
+      <div class="${bodyCls}">
+        <div class="hotel-dates">
+          <div class="fgrp">
+            <label class="flabel">체크인</label>
+            <div class="hcal-wrap" id="hcw-cin-${h.id}">
+              <button class="hcal-btn" id="hcb-cin-${h.id}" onclick="toggleHCal('cin','${h.id}',event)">
+                <span class="hcal-btn-ico">📅</span>
+                <span class="hcal-btn-txt" id="hct-cin-${h.id}">${h.cin||'날짜 선택'}</span>
+                <span style="font-size:9px;color:var(--text3)">▾</span>
+              </button>
+              <div class="hcal-pop" id="hcal-cin-${h.id}"></div>
+            </div>
+          </div>
+          <div class="fgrp">
+            <label class="flabel">체크아웃</label>
+            <div class="hcal-wrap" id="hcw-cout-${h.id}">
+              <button class="hcal-btn" id="hcb-cout-${h.id}" onclick="toggleHCal('cout','${h.id}',event)">
+                <span class="hcal-btn-ico">📅</span>
+                <span class="hcal-btn-txt" id="hct-cout-${h.id}">${h.cout||'날짜 선택'}</span>
+                <span style="font-size:9px;color:var(--text3)">▾</span>
+              </button>
+              <div class="hcal-pop" id="hcal-cout-${h.id}"></div>
+            </div>
+          </div>
+        </div>
+        <div class="fgrp hotel-notes">
+          <label class="flabel">메모 / 특이사항</label>
+          <input class="finput" value="${h.note||''}" placeholder="예: Late checkout 요청, 조식 포함" onchange="updateHotel('${h.id}','note',this.value)">
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  updateSummary();
+}
+
+function toggleHotelOpen(id){
+  const h=S.hotels.find(x=>x.id===id);
+  if(h){h.open=!h.open;renderHotels()}
+}
+function updateHotel(id,key,val){const h=S.hotels.find(x=>x.id===id);if(h){h[key]=val;updateSummary()}}
+
+// ── HOTEL INLINE CALENDAR ──
+const HCAL={open:{}}; // key: 'cin_hotelId' or 'cout_hotelId'
+const HCAL_VIEW={}; // key: same → {y,m}
+
+function hCalKey(type,hid){return type+'_'+hid}
+
+function toggleHCal(type,hid,ev){
+  if(ev)ev.stopPropagation();
+  const key=hCalKey(type,hid);
+  // close all others
+  Object.keys(HCAL.open).forEach(k=>{if(k!==key&&HCAL.open[k]){closeHCal(k)}});
+  HCAL.open[key]=!HCAL.open[key];
+  const popEl=document.getElementById('hcal-'+type+'-'+hid);
+  const btnEl=document.getElementById('hcb-'+type+'-'+hid);
+  if(!popEl||!btnEl)return;
+  if(HCAL.open[key]){
+    // init view based on current value
+    const h=S.hotels.find(x=>x.id===hid);
+    const curVal=h?h[type]:'';
+    const d=curVal?new Date(curVal.replace(/-/g,'/')):new Date();
+    if(!HCAL_VIEW[key])HCAL_VIEW[key]={y:d.getFullYear(),m:d.getMonth()};
+    renderHCal(type,hid);
+    popEl.classList.add('open');
+    btnEl.classList.add('open');
+  } else {
+    closeHCal(key);
+  }
+}
+
+function closeHCal(key){
+  HCAL.open[key]=false;
+  const [type,...rest]=key.split('_');const hid=rest.join('_');
+  const popEl=document.getElementById('hcal-'+type+'-'+hid);
+  const btnEl=document.getElementById('hcb-'+type+'-'+hid);
+  if(popEl)popEl.classList.remove('open');
+  if(btnEl)btnEl.classList.remove('open');
+}
+
+function hCalNav(type,hid,dir,ev){
+  if(ev)ev.stopPropagation();
+  const key=hCalKey(type,hid);
+  if(!HCAL_VIEW[key])HCAL_VIEW[key]={y:2026,m:3};
+  HCAL_VIEW[key].m+=dir;
+  if(HCAL_VIEW[key].m<0){HCAL_VIEW[key].m=11;HCAL_VIEW[key].y--}
+  if(HCAL_VIEW[key].m>11){HCAL_VIEW[key].m=0;HCAL_VIEW[key].y++}
+  renderHCal(type,hid);
+}
+
+function renderHCal(type,hid){
+  const key=hCalKey(type,hid);
+  if(!HCAL_VIEW[key])HCAL_VIEW[key]={y:2026,m:3};
+  const {y,m}=HCAL_VIEW[key];
+  const fd=new Date(y,m,1).getDay();
+  const dm=new Date(y,m+1,0).getDate();
+  const today=new Date();today.setHours(0,0,0,0);
+  const h=S.hotels.find(x=>x.id===hid);
+  const cinD=h&&h.cin?new Date(h.cin.replace(/-/g,'/')):null;
+  const coutD=h&&h.cout?new Date(h.cout.replace(/-/g,'/')):null;
+
+  let html=`<div class="cal-nav">
+    <button class="cal-navbtn" onclick="hCalNav('${type}','${hid}',-1,event)">‹</button>
+    <span class="cal-ml">${y}년 ${MONTHS[m]}</span>
+    <button class="cal-navbtn" onclick="hCalNav('${type}','${hid}',1,event)">›</button>
+  </div><div class="cal-grid">`;
+  DOWS.forEach(d=>{html+=`<div class="cal-dow">${d}</div>`});
+  for(let i=0;i<fd;i++)html+=`<div class="cal-d emp"></div>`;
+  for(let d=1;d<=dm;d++){
+    const cur=new Date(y,m,d);let cls='cal-d';
+    if(cur.getTime()===today.getTime())cls+=' today';
+    if(type==='cin'&&cinD&&cur.getTime()===cinD.getTime())cls+=' sel';
+    if(type==='cout'&&coutD&&cur.getTime()===coutD.getTime())cls+=' sel';
+    if(cinD&&coutD&&cur>cinD&&cur<coutD)cls+=' inr';
+    html+=`<div class="${cls}" onclick="pickHDay('${type}','${hid}',${y},${m},${d})">${d}</div>`;
+  }
+  html+='</div>';
+  const popEl=document.getElementById('hcal-'+type+'-'+hid);
+  if(popEl)popEl.innerHTML=html;
+}
+
+function pickHDay(type,hid,y,m,d){
+  const iso=`${y}-${pad(m+1)}-${pad(d)}`;
+  const h=S.hotels.find(x=>x.id===hid);
+  if(h){
+    h[type]=iso;
+    const txtEl=document.getElementById('hct-'+type+'-'+hid);
+    if(txtEl)txtEl.textContent=iso;
+    // 체크인 선택 시 체크아웃 뷰를 같은 달로 이동
+    if(type==='cin'){
+      const coutKey=hCalKey('cout',hid);
+      HCAL_VIEW[coutKey]={y,m};
+    }
+    // re-render both cals for range highlight
+    renderHCal('cin',hid);
+    renderHCal('cout',hid);
+    // update hotel sub display
+    const subEl=document.querySelector(`#hitem-${hid} .hotel-sub`);
+    if(subEl){
+      subEl.textContent=`${h.city}${h.cin?' · 체크인 '+h.cin:''} ${h.cout?'~ '+h.cout:''}`;
+    }
+    updateSummary();
+  }
+  closeHCal(hCalKey(type,hid));
+}
+
+// close hotel cals on outside click
+document.addEventListener('click',e=>{
+  Object.keys(HCAL.open).forEach(key=>{
+    if(!HCAL.open[key])return;
+    const [type,...rest]=key.split('_');const hid=rest.join('_');
+    const wrap=document.getElementById('hcw-'+type+'-'+hid);
+    if(wrap&&!wrap.contains(e.target))closeHCal(key);
+  });
+});
+function deleteHotel(id){S.hotels=S.hotels.filter(h=>h.id!==id);renderHotels()}
+
+// 이전에 입력한 호텔 목록(이름+도시)을 저장해두고 다음 출장에서 재사용
+const SAVED_HOTELS_KEY='ts_saved_hotels';
+function getSavedHotels(){
+  try{ return JSON.parse(localStorage.getItem(SAVED_HOTELS_KEY)||'[]'); }catch(e){ return []; }
+}
+function saveSavedHotel(name, city){
+  if(!name) return;
+  let list=getSavedHotels().filter(h=>!(h.name===name && h.city===city));
+  list.unshift({name, city});
+  if(list.length>30) list=list.slice(0,30);
+  localStorage.setItem(SAVED_HOTELS_KEY, JSON.stringify(list));
+}
+function renderSavedHotelsSelect(){
+  const sel=document.getElementById('mh-saved');
+  const list=getSavedHotels();
+  sel.innerHTML=`<option value="">-- 새 호텔 직접 입력 --</option>`+
+    list.map((h,i)=>`<option value="${i}">${h.name}${h.city?' ('+h.city+')':''}</option>`).join('');
+}
+function pickSavedHotel(idx){
+  if(idx===''){ document.getElementById('mh-name').value=''; document.getElementById('mh-city').value=''; return; }
+  const h=getSavedHotels()[Number(idx)];
+  if(!h) return;
+  document.getElementById('mh-name').value=h.name;
+  document.getElementById('mh-city').value=h.city||'';
+}
+
+function openAddHotel(){
+  document.getElementById('mh-name').value='';
+  document.getElementById('mh-city').value='';
+  document.getElementById('mh-cin').value=S.startDate?toISO(S.startDate):'';
+  document.getElementById('mh-cout').value=S.endDate?toISO(S.endDate):'';
+  document.getElementById('mh-note').value='';
+  renderSavedHotelsSelect();
+  openModal('modal-hotel');
+}
+function confirmAddHotel(){
+  const name=document.getElementById('mh-name').value.trim();
+  if(!name){showNotif('호텔명을 입력하세요');return}
+  const city=document.getElementById('mh-city').value.trim();
+  S.hotels.push({
+    id:uid(),
+    name,
+    city,
+    cin:document.getElementById('mh-cin').value,
+    cout:document.getElementById('mh-cout').value,
+    note:document.getElementById('mh-note').value.trim(),
+    open:true
+  });
+  saveSavedHotel(name, city);
+  closeModal('modal-hotel');renderHotels();showNotif('호텔이 추가되었습니다');
+}
+
+// ============================================================
+// MODAL HELPERS
+// ============================================================
+function openModal(id){document.getElementById(id).classList.add('open')}
+function closeModal(id){document.getElementById(id).classList.remove('open')}
+document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open')}));
+
+// ============================================================
+// TIMELINE
+// ============================================================
+// 실제 시각(HH:MM으로 시작)인지 판별 — '-'/'체크인'/'체크아웃'/빈값 등은 시간 없음(수동 정렬 대상)
+function isTimedTl(t){ return /^\d{1,2}:\d{2}/.test(t||''); }
+
+function renderTimeline(){
+  const el=document.getElementById('tl-view');
+  if(!S.startDate||!S.endDate){el.innerHTML=`<div style="color:var(--text3);padding:30px 0;text-align:center">기본 정보에서 출발일·귀국일을 먼저 설정하세요</div>`;return}
+  const days=[];const cur=new Date(S.startDate);
+  while(cur<=S.endDate){days.push(new Date(cur));cur.setDate(cur.getDate()+1)}
+  const visT=S.transfers.filter(t=>t.on);
+  const last=days.length-1;
+
+  // o = {time, icon, text, tag, tagLabel, kind, id, editable}
+  // kind/id가 있으면 드래그로 옮기거나 순서를 바꿀 수 있고, editable이면 직접 입력/삭제 가능
+  // note가 아닌 항목은 더블클릭하면 해당 항목을 수정할 수 있는 탭으로 이동한다
+  function ev(o){
+    const key = o.kind ? `${o.kind}:${o.id}` : '';
+    const drag = o.kind ? `draggable="true" ondragstart="tlDragStart(event,'${o.kind}','${o.id}')" ondragend="tlDragEnd(event)" ondragover="tlItemDragOver(event)" ondrop="tlDropOnItem(event,'${o.iso}','${key}')"` : '';
+    const editNav = (o.kind && o.kind!=='note') ? `ondblclick="tlEditItem('${o.kind}','${o.id}')" title="더블클릭하여 수정" style="cursor:pointer"` : '';
+    const timeHtml = o.editable
+      ? `<span contenteditable="true" oninput="updateDayNoteField('${o.id}','time',this.textContent)" onblur="renderTimeline()">${o.time}</span>`
+      : o.time;
+    const textHtml = o.editable
+      ? `<span contenteditable="true" oninput="updateDayNoteField('${o.id}','text',this.textContent)" onblur="renderTimeline()">${o.text}</span>`
+      : o.text;
+    const delBtn = o.editable ? `<button type="button" class="tl-ev-del" onclick="deleteDayNote('${o.id}')" title="삭제">✕</button>` : '';
+    return`<div class="tl-ev" ${drag} ${editNav}><div class="tl-t">${timeHtml}</div><div class="tl-ic">${o.icon}</div><div class="tl-tx">${textHtml}</div>${o.tag?`<span class="tag ${o.tag}">${o.tagLabel}</span>`:''}${delBtn}</div>`;
+  }
+
+  el.innerHTML=days.map((d,i)=>{
+    const lbl=`${d.getMonth()+1}/${d.getDate()} (${DOWS[d.getDay()]})`;
+    const iso=toISO(d);const rows=[];
+    // 항공편
+    S.flights.filter(f=>f.date===iso).forEach(f=>{
+      const ac=f.airline==='KE'||f.airline==='OZ'?'tag-ke':f.airline==='GA'?'tag-ga':'';
+      rows.push({time:`${f.depT}–${f.arrT}`,icon:'✈',text:`${f.dep} → ${f.arr}  ${f.num}`,tag:ac,tagLabel:f.airline,kind:'flight',id:f.id,iso});
+    });
+    // 차량
+    visT.filter(t=>t.date===iso).forEach(t=>{
+      rows.push({time:t.time||'-',icon:'🚗',text:t.label,tag:'tag-car',tagLabel:'차량',kind:'transfer',id:t.id,iso});
+    });
+    // 차량 (날짜 미지정이고 특수 위치)
+    if(i===0){visT.filter(t=>!t.date&&t.label.includes('도착')).forEach(t=>rows.push({time:t.time||'-',icon:'🚗',text:t.label,tag:'tag-car',tagLabel:'배차',kind:'transfer',id:t.id,iso}))}
+    if(i===last){visT.filter(t=>!t.date&&t.label.includes('귀국')).forEach(t=>rows.push({time:t.time||'-',icon:'🚗',text:t.label,tag:'tag-car',tagLabel:'배차',kind:'transfer',id:t.id,iso}))}
+    // 호텔 체크인/아웃
+    S.hotels.forEach(h=>{
+      if(h.cin===iso)rows.push({time:'체크인',icon:'🏨',text:`${h.name} (${h.city}) 체크인`,tag:'tag-hotel',tagLabel:'호텔',kind:'hotel-cin',id:h.id,iso});
+      if(h.cout===iso)rows.push({time:'체크아웃',icon:'🏨',text:`${h.name} 체크아웃${h.note?' · '+h.note:''}`,tag:'tag-hotel',tagLabel:'호텔',kind:'hotel-cout',id:h.id,iso});
+    });
+    // 직접 입력한 날짜별 활동
+    (S.dayNotes[iso]||[]).forEach(n=>{
+      rows.push({time:n.time||'-',icon:'📝',text:n.text||'(활동 내용 입력)',tag:'tag-meet',tagLabel:'메모',kind:'note',id:n.id,iso,editable:true});
+    });
+
+    // 시간이 없는 항목(호텔 체크인/아웃, 메모 등)은 시간 있는 항목 사이 어디든 자유롭게 드래그로 옮길 수 있고,
+    // 시간이 있는 항목(항공편 등)끼리는 어느 자리에 있든 항상 서로 시간순을 유지한다.
+    let finalRows;
+    if(!rows.length){
+      finalRows=[{time:'-',icon:'📋',text:'일정 없음 / 이동일'}];
+    } else {
+      rows.forEach(r=>{ r.key=`${r.kind}:${r.id}` });
+      const rowsByKey={}; rows.forEach(r=>{ rowsByKey[r.key]=r });
+      const keysNow=rows.map(r=>r.key);
+
+      // 1) 기존 순서에서 아직 존재하는 항목만 유지
+      let seq=(S.dayOrder[iso]||[]).filter(k=>keysNow.includes(k));
+      // 2) 순서에 없던(새로 생긴) 항목 추가 — 시간 있는 항목은 기존 시간순 항목들 사이 적절한 위치에, 없으면 맨 뒤에
+      rows.filter(r=>!seq.includes(r.key)).forEach(r=>{
+        if(isTimedTl(r.time)){
+          let insertAt=seq.length;
+          for(let idx=0; idx<seq.length; idx++){
+            const other=rowsByKey[seq[idx]];
+            if(isTimedTl(other.time) && other.time>r.time){ insertAt=idx; break; }
+          }
+          seq.splice(insertAt,0,r.key);
+        } else {
+          seq.push(r.key);
+        }
+      });
+      // 3) 시간이 있는 항목이 차지한 자리는 그대로 두고, 그 자리에 들어갈 값만 시간순으로 재배치
+      //    (시간 없는 항목의 위치는 그대로 유지되어 드래그한 자리를 지킨다)
+      const timedSorted=rows.filter(r=>isTimedTl(r.time)).sort((a,b)=>a.time.localeCompare(b.time)).map(r=>r.key);
+      let ti=0;
+      seq=seq.map(k=> isTimedTl(rowsByKey[k].time) ? timedSorted[ti++] : k);
+      S.dayOrder[iso]=seq;
+      finalRows=seq.map(k=>rowsByKey[k]);
+    }
+
+    return`<div class="tl-day" ondragover="tlDragOver(event)" ondragleave="tlDragLeave(event)" ondrop="tlDrop(event,'${iso}')">
+      <div class="tl-hdr"><div class="tl-dot"></div><div class="tl-dn">Day ${i+1}</div><div class="tl-dd">${lbl}</div><button type="button" class="tl-add-note" onclick="addDayNote('${iso}')" title="이 날짜에 활동 추가">+ 활동</button></div>
+      <div class="tl-evs">${finalRows.map(ev).join('')}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── 드래그로 항목을 다른 날짜에 옮기거나(시간 없는 항목은) 같은 날짜 안에서 순서 변경 ──
+let _tlDrag=null;
+function tlDragStart(ev, kind, id){
+  _tlDrag={kind,id,key:`${kind}:${id}`};
+  if(ev.dataTransfer){ev.dataTransfer.effectAllowed='move';ev.dataTransfer.setData('text/plain', _tlDrag.key)}
+  ev.currentTarget.classList.add('dragging');
+}
+function tlDragEnd(ev){
+  ev.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.tl-day.drag-over').forEach(d=>d.classList.remove('drag-over'));
+}
+function tlDragOver(ev){
+  ev.preventDefault();
+  ev.currentTarget.classList.add('drag-over');
+}
+function tlItemDragOver(ev){
+  ev.preventDefault();
+  ev.stopPropagation();
+}
+function tlDragLeave(ev){
+  ev.currentTarget.classList.remove('drag-over');
+}
+
+// kind/id가 가리키는 항목의 날짜를 iso로 변경
+function tlMoveToDay(kind, id, iso){
+  if(kind==='flight'){
+    const f=S.flights.find(x=>x.id===id); if(f) f.date=iso;
+  } else if(kind==='transfer'){
+    const t=S.transfers.find(x=>x.id===id); if(t) t.date=iso;
+  } else if(kind==='hotel-cin'){
+    const h=S.hotels.find(x=>x.id===id); if(h) h.cin=iso;
+  } else if(kind==='hotel-cout'){
+    const h=S.hotels.find(x=>x.id===id); if(h) h.cout=iso;
+  } else if(kind==='note'){
+    for(const k in S.dayNotes){
+      const idx=S.dayNotes[k].findIndex(n=>n.id===id);
+      if(idx>-1){
+        const [n]=S.dayNotes[k].splice(idx,1);
+        if(!S.dayNotes[iso]) S.dayNotes[iso]=[];
+        S.dayNotes[iso].push(n);
+        break;
+      }
+    }
+  }
+}
+
+// 빈 공간(날짜 전체)에 드롭 — 날짜 이동 + 시간없는 항목은 맨 뒤로
+function tlDrop(ev, iso){
+  ev.preventDefault();
+  ev.currentTarget.classList.remove('drag-over');
+  if(!_tlDrag) return;
+  const {kind,id,key}=_tlDrag;
+  _tlDrag=null;
+  tlMoveToDay(kind,id,iso);
+  const order=(S.dayOrder[iso]||[]).filter(k=>k!==key);
+  order.push(key);
+  S.dayOrder[iso]=order;
+  renderTimeline();
+  updateSummary();
+}
+
+// 특정 항목 위에 드롭 — 그 항목 바로 앞에 순서 삽입(시간이 있으면 시간순으로 자동 정렬됨)
+function tlDropOnItem(ev, iso, targetKey){
+  ev.preventDefault();
+  ev.stopPropagation();
+  document.querySelectorAll('.tl-day.drag-over').forEach(d=>d.classList.remove('drag-over'));
+  if(!_tlDrag) return;
+  const {kind,id,key}=_tlDrag;
+  _tlDrag=null;
+  if(key===targetKey) return;
+  tlMoveToDay(kind,id,iso);
+  const order=(S.dayOrder[iso]||[]).filter(k=>k!==key);
+  let idx=order.indexOf(targetKey);
+  if(idx===-1) idx=order.length;
+  order.splice(idx,0,key);
+  S.dayOrder[iso]=order;
+  renderTimeline();
+  updateSummary();
+}
+
+// 일정표 항목을 더블클릭하면 해당 항목을 실제로 수정할 수 있는 탭으로 이동해 보여준다
+function tlEditItem(kind, id){
+  if(kind==='flight'){
+    goTab('flight');
+    _fiExpanded.add(id);
+    renderFlights();
+    setTimeout(()=>document.getElementById('fiw-'+id)?.scrollIntoView({block:'center',behavior:'smooth'}),50);
+  } else if(kind==='transfer'){
+    goTab('transfer');
+    setTimeout(()=>document.getElementById('tritem-'+id)?.scrollIntoView({block:'center',behavior:'smooth'}),50);
+  } else if(kind==='hotel-cin' || kind==='hotel-cout'){
+    const h=S.hotels.find(x=>x.id===id);
+    if(h) h.open=true;
+    goTab('hotel');
+    setTimeout(()=>document.getElementById('hitem-'+id)?.scrollIntoView({block:'center',behavior:'smooth'}),50);
+  }
+}
+
+// ============================================================
+// EXPORT
+// ============================================================
+
+// 일자별로 항공편·차량·호텔 이벤트를 모아 표 형태 데이터로 정리
+function buildExportRows(){
+  const days=[];const cur=new Date(S.startDate);
+  while(cur<=S.endDate){days.push(new Date(cur));cur.setDate(cur.getDate()+1)}
+  const visT=S.transfers.filter(t=>t.on);
+  const visH=S.hotels;
+  const last=days.length-1;
+  return days.map((d,i)=>{
+    const iso=toISO(d);
+    const rows=[];
+    S.flights.filter(f=>f.date===iso).forEach(f=>{
+      rows.push({time:`${f.depT} – ${f.arrT}`,text:`이동: ${f.dep} → ${f.arr}`,flight:f.num,cls:'exp-row-'+(f.airline==='GA'?'ga':'flight')});
+    });
+    visT.filter(t=>t.date===iso).forEach(t=>{
+      rows.push({time:t.time||'-',text:t.label,cls:'exp-row-move'});
+    });
+    if(i===0){visT.filter(t=>!t.date&&t.label.includes('도착')).forEach(t=>rows.push({time:t.time||'-',text:t.label,cls:'exp-row-move'}))}
+    if(i===last){visT.filter(t=>!t.date&&t.label.includes('귀국')).forEach(t=>rows.push({time:t.time||'-',text:t.label,cls:'exp-row-move'}))}
+    (S.dayNotes[iso]||[]).forEach(n=>rows.push({time:n.time||'',text:n.text||'',cls:'',noteId:n.id}));
+    rows.sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+    if(!rows.length) rows.push({time:'-',text:'일정 없음 / 이동일',cls:''});
+    const hotel=visH.find(h=>h.cin&&h.cout&&h.cin<=iso&&iso<h.cout);
+    return {date:d, iso, rows, hotel:hotel?hotel.name:''};
+  });
+}
+
+// ── 날짜별 활동(직접 입력) 관리 ──
+function addDayNote(iso){
+  if(!S.dayNotes[iso]) S.dayNotes[iso]=[];
+  S.dayNotes[iso].push({id:uid(), time:'', text:''});
+  renderTimeline();
+}
+function updateDayNoteField(id, field, val){
+  for(const iso in S.dayNotes){
+    const n=S.dayNotes[iso].find(x=>x.id===id);
+    if(n){ n[field]=val; return; }
+  }
+}
+function deleteDayNote(id){
+  for(const iso in S.dayNotes){
+    S.dayNotes[iso]=S.dayNotes[iso].filter(x=>x.id!==id);
+  }
+  renderTimeline();
+}
+
+function renderExport(){
+  const box=document.getElementById('exp-box');
+  if(!S.startDate||!S.endDate){
+    box.innerHTML=`<div style="color:var(--text3);padding:20px;text-align:center">기본 정보에서 출발일·귀국일을 먼저 설정하세요</div>`;
+    box._copyText='';
+    return;
+  }
+  const n=Math.round((S.endDate-S.startDate)/86400000);
+  const fmtMD=d=>`${d.getMonth()+1}월 ${d.getDate()}일(${DOWS[d.getDay()]})`;
+  const titleMain=`${S.dept} ${S.name} 출장 (${fmtMD(S.startDate)} ~ ${fmtMD(S.endDate)})`;
+  const dayRows=buildExportRows();
+
+  let bodyHtml='';
+  dayRows.forEach((day,i)=>{
+    const rowspan=day.rows.length;
+    day.rows.forEach((r,ri)=>{
+      bodyHtml+=`<tr class="${r.cls||''}">`;
+      if(ri===0){
+        bodyHtml+=`<td class="exp-no" rowspan="${rowspan}">${i+1}</td>`;
+        bodyHtml+=`<td class="exp-date" rowspan="${rowspan}">${day.date.getFullYear()}년 ${day.date.getMonth()+1}월 ${day.date.getDate()}일<br><span class="exp-dow">(${DOWS[day.date.getDay()]})</span></td>`;
+      }
+      bodyHtml+=`<td class="exp-time">${r.time}</td>`;
+      bodyHtml+=`<td class="exp-activity"><span class="exp-activity-text">${r.text}</span></td>`;
+      bodyHtml+=`<td class="exp-flight-cell">${r.flight||''}</td>`;
+      bodyHtml+=`<td class="exp-hotel-cell">${ri===rowspan-1?(day.hotel||''):''}</td>`;
+      bodyHtml+='</tr>';
+    });
+  });
+
+  box.innerHTML=`<table class="exp-table">
+    <tr class="exp-title-row"><td class="exp-title-main" colspan="4">${titleMain}</td><td class="exp-title-dur" colspan="2">(${n}박${n+1}일)</td></tr>
+    <tr class="exp-hdr-row"><th>No</th><th>DATE</th><th>TIME</th><th>ACTIVITIES</th><th>항공편</th><th>숙박</th></tr>
+    ${bodyHtml}
+    <tr class="exp-foot-row"><td colspan="6">TripPlanner 자동 생성 · ${S.country} · ${S.city} · ${S.purpose}</td></tr>
+  </table>`;
+  box._copyText=buildExportText();
+}
+
+// 클립보드 복사용 플레인 텍스트
+function buildExportText(){
+  const nm=S.name,dp=S.dept,cn=S.country,ci=S.city,pu=S.purpose;
+  const n=S.startDate&&S.endDate?Math.round((S.endDate-S.startDate)/86400000):'?';
+  const fLines=S.flights.length?S.flights.map(f=>`    [${f.num}]  ${f.dep}→${f.arr}  ${f.depT}–${f.arrT}${f.date?' ('+f.date+')':''}`).join('\n'):'    (없음)';
+  const tLines=S.transfers.filter(t=>t.on).map(t=>`    ✓  ${t.label}${t.date?' · '+t.date:''}${t.time?' '+t.time:''}`).join('\n')||'    (없음)';
+  const hLines=S.hotels.map(h=>`    [${h.city}]  ${h.name}  체크인:${h.cin||'?'} ~ 체크아웃:${h.cout||'?'}${h.note?' ('+h.note+')':''}`).join('\n')||'    (없음)';
+  const noteLines=Object.keys(S.dayNotes).sort().flatMap(iso=>(S.dayNotes[iso]||[]).filter(n=>n.text).map(n=>`    ${iso}${n.time?' '+n.time:''}  ${n.text}`)).join('\n')||'    (없음)';
+  return `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  출장 일정표  /  ${dp}  ${nm}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  기간  : ${S.startDate?toISO(S.startDate):'?'} ~ ${S.endDate?toISO(S.endDate):'?'}  (${n}박${parseInt(n)+1}일)
+  목적지: ${cn} · ${ci}
+  목적  : ${pu}
+
+━ 항공편 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${fLines}
+
+━ 차량 배차 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${tLines}
+
+━ 호텔 예약 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${hLines}
+
+━ 일자별 활동 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${noteLines}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  * TripPlanner 자동 생성
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+}
+function copyExp(){
+  const box=document.getElementById('exp-box');
+  navigator.clipboard.writeText(box._copyText||box.textContent).then(()=>showNotif('클립보드에 복사되었습니다'));
+}
+
+// 시간 문자열("09:30 – 13:00" 또는 "21:00" 또는 '-')을 [출발,구분,도착] 3칸으로 분리 — "상세출장일정.xlsx" 서식의 D/E/F 열 구조
+function splitTimeCells(timeStr){
+  if(!timeStr || timeStr==='-') return ['-','',''];
+  const parts=String(timeStr).split(' – ');
+  if(parts.length===2) return [parts[0],'-',parts[1]];
+  return [timeStr,'',''];
+}
+
+// "상세출장일정.xlsx" 양식(No/DATE/TIME/ACTIVITIES/항공편/숙박 + 항공편 요약 + 차량·호텔 요약, 3단 표)을 그대로 재현해 엑셀로 저장
+function exportExcel(){
+  if(!S.startDate||!S.endDate){ showNotif('먼저 출발일·귀국일을 설정하세요'); return; }
+  const n=Math.round((S.endDate-S.startDate)/86400000);
+  const fmtMD=d=>`${d.getMonth()+1}월 ${d.getDate()}일(${DOWS[d.getDay()]})`;
+  const titleMain=`${S.dept} ${S.name} 출장 (${fmtMD(S.startDate)} ~ ${fmtMD(S.endDate)})`;
+  const durText=`(${n}박${n+1}일)`;
+
+  const aoa=[];
+  const merges=[];
+  const addHeader=(cols)=>{
+    const r=aoa.length;
+    aoa.push(['','No.','DATE','TIME','','','ACTIVITIES',cols[0],cols[1]]);
+    merges.push({s:{r,c:3},e:{r,c:5}});
+  };
+
+  // ── 표1: 전체 일정표 ──
+  aoa.push(['',titleMain,'','','','','','',durText]);
+  merges.push({s:{r:0,c:1},e:{r:0,c:6}});
+  addHeader(['항공편','숙박']);
+  buildExportRows().forEach((day,i)=>{
+    day.rows.forEach((r,ri)=>{
+      const [ts,dash,te]=splitTimeCells(r.time);
+      const dateStr = ri===0 ? `${toISO(day.date)} (${DOWS[day.date.getDay()]})` : '';
+      aoa.push(['', ri===0?(i+1):'', dateStr, ts, dash, te, r.text, r.flight||'', ri===day.rows.length-1?(day.hotel||''):'']);
+    });
+  });
+
+  // ── 표2: 항공편 요약 ──
+  aoa.push([]);
+  addHeader(['Airplane','비고']);
+  [...S.flights].sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.depT||'').localeCompare(b.depT||'')).forEach((f,idx)=>{
+    const plus1=(f.arrT||'').includes('+1');
+    const arrClean=(f.arrT||'').replace('+1','');
+    const depName=IATA_TO_NAME[f.dep]||f.dep, arrName=IATA_TO_NAME[f.arr]||f.arr;
+    const activities=`${depName} (${f.dep}) → ${arrName} (${f.arr})${plus1?' (+1)':''}`;
+    aoa.push(['', idx+1, f.date||'', f.depT||'', '-', arrClean, activities, f.num||'', f.note||'']);
+  });
+
+  // ── 표3: 차량 배차 · 호텔 요약 ──
+  aoa.push([]);
+  addHeader(['Transportation','Hotel']);
+  [...S.transfers].filter(t=>t.on).sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.time||'').localeCompare(b.time||'')).forEach((t,idx)=>{
+    const showHotel=/호텔|hotel/i.test(t.label);
+    const hotel=showHotel && t.date ? S.hotels.find(h=>h.cin && h.cin<=t.date && (!h.cout||t.date<h.cout)) : null;
+    aoa.push(['', idx+1, t.date||'', t.time||'-', '', '', t.label, 'O', hotel?hotel.name:'']);
+  });
+
+  aoa.push([]);
+  aoa.push(['','TripPlanner 자동 생성 · '+S.country+' · '+S.city+' · '+S.purpose]);
+  merges.push({s:{r:aoa.length-1,c:1},e:{r:aoa.length-1,c:8}});
+
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!merges']=merges;
+  ws['!cols']=[{wch:3},{wch:5},{wch:21},{wch:7},{wch:3},{wch:7},{wch:57},{wch:19},{wch:20}];
+
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '출장');
+  const filename=`${S.name||'출장'}_${S.city||''}_일정.xlsx`;
+  XLSX.writeFile(wb, filename);
+  showNotif('엑셀 파일로 저장되었습니다');
+}
+
+// 인쇄 시 출력 표가 가로 1장 안에 들어가도록 자동 축소
+function fitExportForPrint(){
+  const box=document.getElementById('exp-box');
+  if(!box) return;
+  box.style.zoom='1';
+  const pageW=1030, pageH=700; // 가로 A4, 여백 10mm 기준 인쇄 가능 영역(px, 96dpi)
+  const rect=box.getBoundingClientRect();
+  if(rect.width<=0||rect.height<=0) return;
+  const scale=Math.min(1, pageW/rect.width, pageH/rect.height);
+  box.style.zoom=scale<1?String(scale):'1';
+}
+window.addEventListener('beforeprint', fitExportForPrint);
+window.addEventListener('afterprint', ()=>{
+  const box=document.getElementById('exp-box');
+  if(box) box.style.zoom='1';
+});
+
+// ============================================================
+// INIT
+// ============================================================
+window.onload=async function(){
+  if(loadPersistedState()){
+    hydrateFormFromState();
+    showNotif('이전에 저장된 일정을 불러왔습니다');
+    return;
+  }
+  const today=new Date();today.setHours(0,0,0,0);
+  S.startDate=today;S.endDate=today;
+  CAL.view.s={y:today.getFullYear(),m:today.getMonth()};CAL.view.e={y:today.getFullYear(),m:today.getMonth()};
+  document.getElementById('ct-s').textContent=fmtLong(S.startDate);
+  document.getElementById('ct-e').textContent=fmtLong(S.endDate);
+  renderCal('s');renderCal('e');
+  await autoLoadDefaultFlights();
+  renderFlights();renderTransfers();renderHotels();
+  updateSummary();
+};
+</script>
+</body>
+</html>
