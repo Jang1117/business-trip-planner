@@ -1233,12 +1233,24 @@ function flightAwareUrl(airline, num){
   const code = icao ? `${icao}${numPart}` : compact;
   return `https://www.flightaware.com/live/flight/${encodeURIComponent(code)}`;
 }
+// 아고다 항공편 검색 결과 링크 — 실제 판매 중인 항공편인지(스케줄 존재 여부) 교차검증용. 날짜가 없으면 만들지 않음
+function agodaFlightUrl(dep, arr, dateStr){
+  if(!dep || !arr || !dateStr) return null;
+  const params = new URLSearchParams({
+    cid:'1844104', searchType:'1', cabinType:'Economy', adults:'1',
+    departureFrom:dep, departureFromType:'1', departDate:dateStr,
+    arrivalTo:arr, arrivalToType:'1', sort:'8',
+  });
+  return `https://www.agoda.com/ko-kr/flights/results?${params.toString()}`;
+}
 // 항공편 행에 붙는 "홈페이지 / 실제 확인" 링크 묶음 HTML — 행 클릭(선택) 이벤트와 겹치지 않게 stopPropagation
-function verifyLinksHtml(airline, num){
+function verifyLinksHtml(airline, num, dep, arr, dateStr){
   const home = airlineHomepage(airline);
   const homeLink = home ? `<a href="${home}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="${airline} 항공사 홈페이지" style="text-decoration:none;font-size:11px">🏠</a>` : '';
   const faLink = `<a href="${flightAwareUrl(airline, num)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="FlightAware에서 실제 운항 여부 확인" style="text-decoration:none;font-size:11px">🔍</a>`;
-  return `<span style="display:inline-flex;gap:6px;align-items:center;flex-shrink:0">${homeLink}${faLink}</span>`;
+  const agodaUrl = agodaFlightUrl(dep, arr, dateStr);
+  const agodaLink = agodaUrl ? `<a href="${agodaUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="아고다에서 해당 노선·날짜 실제 판매 여부 확인" style="text-decoration:none;font-size:11px">🛫</a>` : '';
+  return `<span style="display:inline-flex;gap:6px;align-items:center;flex-shrink:0">${homeLink}${faLink}${agodaLink}</span>`;
 }
 
 // ============================================================
@@ -1552,7 +1564,7 @@ function renderFlights(){
             <span class="fi-sched-num">${s.num}</span>
             <span class="fi-sched-time">${s.depT} – ${s.arrT}</span>
             <span class="fi-sched-note">${f.dep} → ${f.arr}</span>
-            ${verifyLinksHtml(s.airline, s.num)}
+            ${verifyLinksHtml(s.airline, s.num, f.dep, f.arr, f.date)}
           </div>`;
         }).join('');
 
@@ -1694,6 +1706,7 @@ async function searchSchedule(){
     listEl.innerHTML=`<div class="sched-item loading">해당 노선 스케줄이 없습니다. 직접 입력을 이용하세요.</div>`;
     return;
   }
+  const searchDate=document.getElementById('mf-date').value;
   listEl.innerHTML=results.map((r,i)=>`
     <div class="sched-item" onclick="pickSchedule(${i})" id="si-${i}">
       <div class="sched-check">✓</div>
@@ -1701,7 +1714,7 @@ async function searchSchedule(){
       <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;min-width:56px">${r.num}</span>
       <span style="font-size:12px;color:var(--text2);flex:1">${dep} → ${arr}</span>
       <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2)">${r.depT} – ${r.arrT}</span>
-      ${verifyLinksHtml(r.airline, r.num)}
+      ${verifyLinksHtml(r.airline, r.num, dep, arr, searchDate)}
     </div>`).join('');
   // store for picking
   listEl._data={results,dep,arr};
