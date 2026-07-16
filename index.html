@@ -916,7 +916,7 @@ function filterNationalCarriers(schedules){
 // 실시간 항공편 스케줄 조회 (AirLabs) + 캐시 + MOCK 폴백
 // ============================================================
 const FLIGHT_API_KEY_STORAGE = 'ts_airlabs_api_key';
-const DEFAULT_FLIGHT_API_KEY = ''; // AirLabs api_key 기본값 — 없으면 사용자가 ⚙ 항공편 API 설정에서 직접 입력
+const DEFAULT_FLIGHT_API_KEY = 'b8826d28-cc96-4984-90db-a617dc4c9b21'; // AirLabs api_key 기본값
 
 // 공유 캐시 프록시(flight-cache-proxy) — Upstash 토큰은 서버에만 있고, 클라이언트는 이 프록시 URL만 안다
 const CACHE_PROXY_URL_STORAGE = 'ts_cache_proxy_url';
